@@ -7,6 +7,7 @@ import streamlit as st
 
 ROOT = Path(__file__).resolve().parents[1]
 DATASET_PATH = ROOT / "data" / "processed" / "tradeoff_dataset.csv"
+DEFAULT_MAX_MRED = 0.25
 
 VARIANT_COLORS = {
     "AxPPA": "#2563EB",
@@ -98,14 +99,30 @@ st.markdown(
         color: #1f2937;
         font-size: 0.95rem;
         font-weight: 700;
-        margin: 0 0 0.35rem 0;
+        margin: 0 0 0.45rem 0;
     }
 
     .filter-note {
         color: #64748b;
         font-size: 0.8rem;
         line-height: 1.35;
-        margin: -0.1rem 0 0.65rem 0;
+        margin: -0.1rem 0 0.75rem 0;
+    }
+
+    .variant-dot-wrap {
+        align-items: center;
+        display: flex;
+        min-height: 1.9rem;
+        padding-top: 0.08rem;
+    }
+
+    .variant-filter-dot {
+        border: 1px solid #ffffff;
+        border-radius: 999px;
+        box-shadow: 0 0 0 1px #cbd5e1;
+        display: inline-block;
+        height: 0.8rem;
+        width: 0.8rem;
     }
 
     .metric-card {
@@ -217,9 +234,7 @@ st.markdown(
         border-radius: 8px;
     }
 
-    [data-testid="stCheckbox"] label p,
-    [data-testid="stSlider"] label,
-    [data-testid="stSlider"] p {
+    [data-testid="stCheckbox"] label p {
         color: #334155 !important;
         font-size: 0.88rem !important;
     }
@@ -388,148 +403,113 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-with st.container(border=True):
-    st.markdown('<p class="panel-title">Filters</p>', unsafe_allow_html=True)
-    st.markdown(
-        '<p class="panel-note">Use the slicer-like checkboxes to choose architecture variants, then refine the acceptable error and savings thresholds.</p>',
-        unsafe_allow_html=True,
-    )
-    variant_filter_col, legend_col, threshold_col = st.columns(
-        [1.55, 1.15, 1.1], gap="large"
-    )
+variant_col, content_col = st.columns([0.72, 3.35], gap="large")
 
-    with variant_filter_col:
+with variant_col:
+    with st.container(border=True):
         st.markdown('<p class="filter-title">Variant</p>', unsafe_allow_html=True)
         st.markdown(
-            '<p class="filter-note">Select the architecture variants shown in the charts.</p>',
+            f'<p class="filter-note">Select the architecture variants shown in the charts. Charts keep MRED <= {DEFAULT_MAX_MRED:.2f} for readable trade-offs.</p>',
             unsafe_allow_html=True,
         )
-        checkbox_cols = st.columns(3)
         selected_variants = []
-        for index, variant in enumerate(all_variants):
-            with checkbox_cols[index % 3]:
+        for variant in all_variants:
+            dot_col, check_col = st.columns([0.14, 0.86], gap="small")
+            with dot_col:
+                st.markdown(
+                    f"""
+                    <div class="variant-dot-wrap">
+                      <span class="variant-filter-dot" style="background:{VARIANT_COLORS.get(variant, '#64748B')}"></span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            with check_col:
                 if st.checkbox(variant, value=True, key=f"variant_{variant}"):
                     selected_variants.append(variant)
-
-    with legend_col:
-        render_legend(all_variants)
-
-    with threshold_col:
-        st.markdown('<p class="filter-title">Thresholds</p>', unsafe_allow_html=True)
-        max_mred = st.slider(
-            "Maximum MRED",
-            min_value=0.0,
-            max_value=1.0,
-            value=0.25,
-            step=0.01,
-        )
-        min_energy = st.slider(
-            "Minimum energy savings (%)",
-            min_value=0.0,
-            max_value=100.0,
-            value=0.0,
-            step=1.0,
-        )
-        min_area = st.slider(
-            "Minimum area savings (%)",
-            min_value=0.0,
-            max_value=100.0,
-            value=0.0,
-            step=1.0,
-        )
-        st.markdown(
-            """
-            <div class="decision-strip">
-            <strong>Decision rule:</strong> filter by acceptable error first,
-            then rank candidates by energy, area, or balanced score.
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
 
 if not selected_variants:
     selected_variants = all_variants
 
 filtered = df[
     df["variant"].isin(selected_variants)
-    & (df["mred"] <= max_mred)
-    & (df["energy_saving_pct"] >= min_energy)
-    & (df["area_saving_pct"] >= min_area)
+    & (df["mred"] <= DEFAULT_MAX_MRED)
 ].copy()
 
-metric_col_1, metric_col_2, metric_col_3 = st.columns(3, gap="large")
-with metric_col_1:
+with content_col:
+    metric_col_1, metric_col_2, metric_col_3 = st.columns(3, gap="large")
+    with metric_col_1:
+        if filtered.empty:
+            render_metric_card("Displayed Architectures", "0", "No rows match filters")
+        else:
+            render_metric_card(
+                "Displayed Architectures",
+                f"{len(filtered):,.0f}",
+                "Architectures after current filters",
+            )
+
+    with metric_col_2:
+        if filtered.empty:
+            render_metric_card("Maximum Energy Savings", "-", "Adjust filters")
+        else:
+            render_metric_card(
+                "Maximum Energy Savings",
+                f"{filtered['energy_saving_pct'].max():.2f}%",
+                f"Within MRED <= {DEFAULT_MAX_MRED:.2f}",
+            )
+
+    with metric_col_3:
+        if filtered.empty:
+            render_metric_card("Maximum Area Savings", "-", "Adjust filters")
+        else:
+            render_metric_card(
+                "Maximum Area Savings",
+                f"{filtered['area_saving_pct'].max():.2f}%",
+                f"Within MRED <= {DEFAULT_MAX_MRED:.2f}",
+            )
+
     if filtered.empty:
-        render_metric_card("Displayed Architectures", "0", "No rows match filters")
+        st.warning("No architectures match the selected filters.")
     else:
-        render_metric_card(
-            "Displayed Architectures",
-            f"{len(filtered):,.0f}",
-            "Architectures after current filters",
-        )
+        energy_col, area_col = st.columns(2, gap="large")
 
-with metric_col_2:
-    if filtered.empty:
-        render_metric_card("Maximum Energy Savings", "-", "Adjust filters")
-    else:
-        render_metric_card(
-            "Maximum Energy Savings",
-            f"{filtered['energy_saving_pct'].max():.2f}%",
-            f"Within MRED <= {max_mred:.2f}",
-        )
+        with energy_col:
+            with st.container(border=True):
+                st.markdown(
+                    """
+                    <p class="chart-title">Energy Savings (%) vs Error (MRED)</p>
+                    <p class="chart-subtitle">Energy view: controlled error with higher power reduction.</p>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                st.plotly_chart(
+                    build_scatter(
+                        filtered,
+                        "energy_saving_pct",
+                        "Energy savings (%)",
+                        selected_variants,
+                    ),
+                    use_container_width=True,
+                )
 
-with metric_col_3:
-    if filtered.empty:
-        render_metric_card("Maximum Area Savings", "-", "Adjust filters")
-    else:
-        render_metric_card(
-            "Maximum Area Savings",
-            f"{filtered['area_saving_pct'].max():.2f}%",
-            f"Within MRED <= {max_mred:.2f}",
-        )
-
-if filtered.empty:
-    st.warning("No architectures match the selected filters.")
-else:
-    energy_col, area_col = st.columns(2, gap="large")
-
-    with energy_col:
-        with st.container(border=True):
-            st.markdown(
-                """
-                <p class="chart-title">Energy Savings (%) vs Error (MRED)</p>
-                <p class="chart-subtitle">Energy view: controlled error with higher power reduction.</p>
-                """,
-                unsafe_allow_html=True,
-            )
-            st.plotly_chart(
-                build_scatter(
-                    filtered,
-                    "energy_saving_pct",
-                    "Energy savings (%)",
-                    selected_variants,
-                ),
-                use_container_width=True,
-            )
-
-    with area_col:
-        with st.container(border=True):
-            st.markdown(
-                """
-                <p class="chart-title">Area Savings (%) vs Error (MRED)</p>
-                <p class="chart-subtitle">Area view: controlled error with smaller circuit footprint.</p>
-                """,
-                unsafe_allow_html=True,
-            )
-            st.plotly_chart(
-                build_scatter(
-                    filtered,
-                    "area_saving_pct",
-                    "Area savings (%)",
-                    selected_variants,
-                ),
-                use_container_width=True,
-            )
+        with area_col:
+            with st.container(border=True):
+                st.markdown(
+                    """
+                    <p class="chart-title">Area Savings (%) vs Error (MRED)</p>
+                    <p class="chart-subtitle">Area view: controlled error with smaller circuit footprint.</p>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                st.plotly_chart(
+                    build_scatter(
+                        filtered,
+                        "area_saving_pct",
+                        "Area savings (%)",
+                        selected_variants,
+                    ),
+                    use_container_width=True,
+                )
 
 if not filtered.empty:
     ranking_tab, pareto_tab, data_tab = st.tabs(["Rankings", "Pareto", "Data"])
