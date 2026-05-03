@@ -1,0 +1,31 @@
+ranking,position,family,variant,configuration,mred,energy_saving_pct,area_saving_pct,balanced_score
+Maior economia de energia com MRED <= 0.10,1,M-AxPPA,M-AxPPA-LOA,"M=1, L=1, K=14",0.0827805237382172,91.4382,59.2601,0.814483
+Maior economia de energia com MRED <= 0.10,2,M-AxPPA,M-AxPPA-LOA,"M=2, L=1, K=13",0.070951,88.62,60.93,0.82143
+Maior economia de energia com MRED <= 0.10,3,Literature,AxPPA,K=16,0.078295,88.1899,71.2733,0.83451
+Maior economia de energia com MRED <= 0.10,4,M-AxPPA,M-AxPPA-LOA,"M=1, L=2, K=13",0.070773,87.9831,56.5088,0.809574
+Maior economia de energia com MRED <= 0.10,5,Literature,AxPPA,K=15,0.068231,84.2559,67.1904,0.822756
+Maior economia de energia com MRED <= 0.10,6,M-AxPPA,M-AxPPA-LOA,"M=1, L=3, K=12",0.05991,82.5999,52.2099,0.793066
+Maior economia de energia com MRED <= 0.10,7,M-AxPPA,M-AxPPA-LOA,"M=2, L=2, K=12",0.061318,81.9925,53.8444,0.792928
+Maior economia de energia com MRED <= 0.10,8,M-AxPPA,M-AxPPA-COPY,"M=2, L=3, K=11",0.084939,81.5645,61.1708,0.781017
+Maior economia de energia com MRED <= 0.10,9,M-AxPPA,M-AxPPA-LOA,"M=3, L=1, K=12",0.061679,81.3075,52.4836,0.787065
+Maior economia de energia com MRED <= 0.10,10,M-AxPPA,M-AxPPA-COPY,"M=1, L=4, K=11",0.08469,80.8701,60.6563,0.777679
+Maior economia de area com MRED <= 0.10,1,Literature,AxPPA,K=16,0.078295,88.1899,71.2733,0.83451
+Maior economia de area com MRED <= 0.10,2,M-AxPPA,M-AxPPA-TRUNC,"M=1, L=6, K=9",0.09282,77.7367,68.0098,0.773605
+Maior economia de area com MRED <= 0.10,3,M-AxPPA,M-AxPPA-TRUNC,"M=2, L=5, K=9",0.093319,77.5477,67.3472,0.770903
+Maior economia de area com MRED <= 0.10,4,Literature,AxPPA,K=15,0.068231,84.2559,67.1904,0.822756
+Maior economia de area com MRED <= 0.10,5,M-AxPPA,M-AxPPA-TRUNC,"M=3, L=4, K=9",0.092368,75.0797,67.174,0.762776
+Maior economia de area com MRED <= 0.10,6,M-AxPPA,M-AxPPA-TRUNC,"M=4, L=3, K=9",0.093758,75.8406,65.8305,0.760956
+Maior economia de area com MRED <= 0.10,7,M-AxPPA,M-AxPPA-TRUNC,"M=6, L=1, K=9",0.092876,73.5912,65.3692,0.752895
+Maior economia de area com MRED <= 0.10,8,Literature,AxPPA,K=14,0.059464,80.6054,65.3456,0.815507
+Maior economia de area com MRED <= 0.10,9,M-AxPPA,M-AxPPA-TRUNC,"M=5, L=2, K=9",0.092239,73.7388,63.5586,0.750133
+Maior economia de area com MRED <= 0.10,10,M-AxPPA,M-AxPPA-TRUNC,"M=3, L=5, K=8",0.073389,70.4982,63.0695,0.758698
+Maior score balanceado,1,Literature,AxPPA,K=16,0.078295,88.1899,71.2733,0.83451
+Maior score balanceado,2,Literature,AxPPA,K=15,0.068231,84.2559,67.1904,0.822756
+Maior score balanceado,3,M-AxPPA,M-AxPPA-LOA,"M=2, L=1, K=13",0.070951,88.62,60.93,0.82143
+Maior score balanceado,4,Literature,AxPPA,K=14,0.059464,80.6054,65.3456,0.815507
+Maior score balanceado,5,M-AxPPA,M-AxPPA-LOA,"M=1, L=1, K=14",0.0827805237382172,91.4382,59.2601,0.814483
+Maior score balanceado,6,M-AxPPA,M-AxPPA-LOA,"M=1, L=2, K=13",0.070773,87.9831,56.5088,0.809574
+Maior score balanceado,7,Literature,AxPPA,K=13,0.051371,76.6075,61.3687,0.801541
+Maior score balanceado,8,M-AxPPA,M-AxPPA-COPY,"M=1, L=1, K=14",0.13690627151044535,95.7913,71.6153,0.796433
+Maior score balanceado,9,M-AxPPA,M-AxPPA-LOA,"M=1, L=3, K=12",0.05991,82.5999,52.2099,0.793066
+Maior score balanceado,10,M-AxPPA,M-AxPPA-LOA,"M=2, L=2, K=12",0.061318,81.9925,53.8444,0.792928

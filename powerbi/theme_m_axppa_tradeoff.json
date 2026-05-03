@@ -1,0 +1,129 @@
+{
+  "name": "M-AxPPA Tradeoff Theme",
+  "dataColors": [
+    "#1E88E5",
+    "#10A37F",
+    "#F59E0B",
+    "#E45756",
+    "#6D5DF6",
+    "#00A6A6",
+    "#8E44AD",
+    "#64748B",
+    "#D946EF",
+    "#2F4858"
+  ],
+  "background": "#F6F7F9",
+  "foreground": "#20242A",
+  "tableAccent": "#10A37F",
+  "visualStyles": {
+    "*": {
+      "*": {
+        "title": [
+          {
+            "show": true,
+            "fontColor": { "solid": { "color": "#20242A" } },
+            "fontSize": 12,
+            "fontFamily": "Segoe UI Semibold"
+          }
+        ],
+        "background": [
+          {
+            "show": true,
+            "color": { "solid": { "color": "#FFFFFF" } },
+            "transparency": 0
+          }
+        ],
+        "border": [
+          {
+            "show": true,
+            "color": { "solid": { "color": "#D9DEE7" } },
+            "radius": 8
+          }
+        ],
+        "visualHeader": [
+          {
+            "show": false
+          }
+        ]
+      }
+    },
+    "scatterChart": {
+      "*": {
+        "categoryAxis": [
+          {
+            "showAxisTitle": true,
+            "labelColor": { "solid": { "color": "#475569" } },
+            "titleColor": { "solid": { "color": "#20242A" } },
+            "gridlineColor": { "solid": { "color": "#E5E7EB" } }
+          }
+        ],
+        "valueAxis": [
+          {
+            "showAxisTitle": true,
+            "labelColor": { "solid": { "color": "#475569" } },
+            "titleColor": { "solid": { "color": "#20242A" } },
+            "gridlineColor": { "solid": { "color": "#E5E7EB" } }
+          }
+        ],
+        "legend": [
+          {
+            "show": true,
+            "fontColor": { "solid": { "color": "#475569" } },
+            "fontSize": 9
+          }
+        ]
+      }
+    },
+    "card": {
+      "*": {
+        "background": [
+          {
+            "show": true,
+            "color": { "solid": { "color": "#FFFFFF" } },
+            "transparency": 0
+          }
+        ],
+        "border": [
+          {
+            "show": true,
+            "color": { "solid": { "color": "#D9DEE7" } },
+            "radius": 8
+          }
+        ],
+        "calloutValue": [
+          {
+            "fontColor": { "solid": { "color": "#111827" } },
+            "fontSize": 24,
+            "fontFamily": "Segoe UI Semibold"
+          }
+        ],
+        "categoryLabels": [
+          {
+            "show": true,
+            "color": { "solid": { "color": "#64748B" } },
+            "fontSize": 9
+          }
+        ]
+      }
+    },
+    "slicer": {
+      "*": {
+        "background": [
+          {
+            "show": true,
+            "color": { "solid": { "color": "#FFFFFF" } },
+            "transparency": 0
+          }
+        ],
+        "border": [
+          {
+            "show": true,
+            "color": { "solid": { "color": "#D9DEE7" } },
+            "radius": 8
+          }
+        ]
+      }
+    }
+  }
+}
+

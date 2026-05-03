@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+.ipynb_checkpoints/
+*.log
+*.sqlite-journal
+*.db-journal
+
+# Local learning/support notes not needed in the public portfolio repo
+docs/caderno_de_estudo.md
+docs/roteiro_de_inicio.md
+portfolio/checklist_publicacao_v1.md
+portfolio/curriculo_linkedin.md
