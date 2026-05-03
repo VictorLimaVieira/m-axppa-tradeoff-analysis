@@ -49,20 +49,20 @@ st.markdown(
     }
 
     .block-container {
-        max-width: 1240px;
-        padding-top: 1.45rem;
-        padding-bottom: 2rem;
+        max-width: 1720px;
+        padding: 1.05rem 2rem 2rem 2rem;
     }
 
     .hero {
         text-align: center;
-        margin-bottom: 1.1rem;
+        margin-bottom: 0.85rem;
     }
 
     .hero h1 {
         color: #1f2937;
-        font-size: 2.2rem;
+        font-size: 2.1rem;
         font-weight: 650;
+        letter-spacing: 0;
         line-height: 1.1;
         margin: 0 0 0.45rem 0;
     }
@@ -73,24 +73,59 @@ st.markdown(
         margin: 0;
     }
 
+    .insight-line {
+        color: #475569;
+        font-size: 0.92rem;
+        margin: 0 0 0.75rem 0;
+        text-align: center;
+    }
+
+    .panel-title {
+        color: #1f2937;
+        font-size: 1rem;
+        font-weight: 750;
+        margin: 0 0 0.15rem 0;
+    }
+
+    .panel-note {
+        color: #64748b;
+        font-size: 0.82rem;
+        line-height: 1.35;
+        margin: 0 0 0.7rem 0;
+    }
+
+    .filter-title {
+        color: #1f2937;
+        font-size: 0.95rem;
+        font-weight: 700;
+        margin: 0 0 0.35rem 0;
+    }
+
+    .filter-note {
+        color: #64748b;
+        font-size: 0.8rem;
+        line-height: 1.35;
+        margin: -0.1rem 0 0.65rem 0;
+    }
+
     .metric-card {
         background: #ffffff;
         border: 1px solid #d8dee8;
         border-radius: 8px;
-        padding: 0.9rem 1rem;
-        margin-bottom: 0.75rem;
+        min-height: 106px;
+        padding: 0.85rem 1rem;
     }
 
     .metric-label {
         color: #1f2937;
         font-size: 0.9rem;
-        font-weight: 650;
+        font-weight: 700;
         margin-bottom: 0.35rem;
     }
 
     .metric-value {
         color: #111827;
-        font-size: 1.8rem;
+        font-size: 1.78rem;
         font-weight: 720;
         line-height: 1.15;
     }
@@ -98,14 +133,21 @@ st.markdown(
     .metric-detail {
         color: #64748b;
         font-size: 0.8rem;
-        margin-top: 0.15rem;
+        margin-top: 0.18rem;
+    }
+
+    .chart-panel {
+        background: #ffffff;
+        border: 1px solid #d8dee8;
+        border-radius: 8px;
+        padding: 0.75rem 0.85rem 0.65rem 0.85rem;
     }
 
     .chart-title {
         color: #1f2937;
         font-size: 1rem;
-        font-weight: 700;
-        margin: 0 0 0.15rem 0;
+        font-weight: 750;
+        margin: 0 0 0.12rem 0;
     }
 
     .chart-subtitle {
@@ -114,25 +156,17 @@ st.markdown(
         margin: 0 0 0.55rem 0;
     }
 
-    .legend-panel {
-        background: #ffffff;
-        border: 1px solid #d8dee8;
-        border-radius: 8px;
-        padding: 0.9rem 1rem;
-        margin-top: 0.75rem;
-    }
-
-    .legend-panel h3 {
+    .legend-title {
         color: #1f2937;
         font-size: 0.95rem;
         font-weight: 700;
-        margin: 0 0 0.55rem 0;
+        margin: 0 0 0.4rem 0;
     }
 
     .legend-grid {
         display: grid;
-        grid-template-columns: 1fr;
-        gap: 0.28rem;
+        gap: 0.18rem 0.75rem;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .legend-item {
@@ -152,15 +186,15 @@ st.markdown(
         width: 0.72rem;
     }
 
-    .decision-note {
+    .decision-strip {
         background: #ffffff;
         border: 1px solid #d8dee8;
         border-radius: 8px;
         color: #475569;
         font-size: 0.84rem;
         line-height: 1.42;
-        margin-top: 0.75rem;
-        padding: 0.85rem 1rem;
+        margin-top: 0.8rem;
+        padding: 0.75rem 0.9rem;
     }
 
     .footer-note {
@@ -183,8 +217,33 @@ st.markdown(
         border-radius: 8px;
     }
 
-    label, p, span {
-        color: inherit;
+    [data-testid="stCheckbox"] label p,
+    [data-testid="stSlider"] label,
+    [data-testid="stSlider"] p {
+        color: #334155 !important;
+        font-size: 0.88rem !important;
+    }
+
+    [data-testid="stCheckbox"] {
+        margin-bottom: -0.35rem;
+    }
+
+    [data-baseweb="tab-list"] {
+        gap: 0.45rem;
+        margin-top: 0.9rem;
+    }
+
+    [data-baseweb="tab"] {
+        color: #334155;
+        font-weight: 650;
+    }
+
+    [data-baseweb="tab"][aria-selected="true"] {
+        color: #2563eb;
+    }
+
+    [data-testid="stPlotlyChart"] .modebar {
+        display: none !important;
     }
     </style>
     """,
@@ -222,8 +281,8 @@ def render_legend(variants: list[str]) -> None:
     )
     st.markdown(
         f"""
-        <div class="legend-panel">
-          <h3>Variant colors</h3>
+        <div>
+          <div class="legend-title">Variant colors</div>
           <div class="legend-grid">{items}</div>
         </div>
         """,
@@ -264,7 +323,7 @@ def build_scatter(
         }
     )
     fig.update_layout(
-        height=292,
+        height=350,
         showlegend=False,
         paper_bgcolor="#ffffff",
         plot_bgcolor="#ffffff",
@@ -319,20 +378,44 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-chart_col, side_col = st.columns([2.1, 1], gap="large")
+st.markdown(
+    """
+    <p class="insight-line">
+    Each point represents one architecture. The best region is upper-left:
+    lower error and higher savings.
+    </p>
+    """,
+    unsafe_allow_html=True,
+)
 
-with side_col:
-    metric_slot = st.container()
+with st.container(border=True):
+    st.markdown('<p class="panel-title">Filters</p>', unsafe_allow_html=True)
+    st.markdown(
+        '<p class="panel-note">Use the slicer-like checkboxes to choose architecture variants, then refine the acceptable error and savings thresholds.</p>',
+        unsafe_allow_html=True,
+    )
+    variant_filter_col, legend_col, threshold_col = st.columns(
+        [1.55, 1.15, 1.1], gap="large"
+    )
 
-    with st.container(border=True):
-        selected_variants = st.multiselect(
-            "Variant",
-            all_variants,
-            default=all_variants,
-            help="Select the architecture variants shown in the charts.",
+    with variant_filter_col:
+        st.markdown('<p class="filter-title">Variant</p>', unsafe_allow_html=True)
+        st.markdown(
+            '<p class="filter-note">Select the architecture variants shown in the charts.</p>',
+            unsafe_allow_html=True,
         )
+        checkbox_cols = st.columns(3)
+        selected_variants = []
+        for index, variant in enumerate(all_variants):
+            with checkbox_cols[index % 3]:
+                if st.checkbox(variant, value=True, key=f"variant_{variant}"):
+                    selected_variants.append(variant)
 
-    with st.container(border=True):
+    with legend_col:
+        render_legend(all_variants)
+
+    with threshold_col:
+        st.markdown('<p class="filter-title">Thresholds</p>', unsafe_allow_html=True)
         max_mred = st.slider(
             "Maximum MRED",
             min_value=0.0,
@@ -354,6 +437,15 @@ with side_col:
             value=0.0,
             step=1.0,
         )
+        st.markdown(
+            """
+            <div class="decision-strip">
+            <strong>Decision rule:</strong> filter by acceptable error first,
+            then rank candidates by energy, area, or balanced score.
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
 if not selected_variants:
     selected_variants = all_variants
@@ -365,54 +457,48 @@ filtered = df[
     & (df["area_saving_pct"] >= min_area)
 ].copy()
 
-with metric_slot:
+metric_col_1, metric_col_2, metric_col_3 = st.columns(3, gap="large")
+with metric_col_1:
     if filtered.empty:
         render_metric_card("Displayed Architectures", "0", "No rows match filters")
-        render_metric_card("Maximum Energy Savings", "-", "Adjust filters")
-        render_metric_card("Maximum Area Savings", "-", "Adjust filters")
     else:
         render_metric_card(
             "Displayed Architectures",
             f"{len(filtered):,.0f}",
             "Architectures after current filters",
         )
+
+with metric_col_2:
+    if filtered.empty:
+        render_metric_card("Maximum Energy Savings", "-", "Adjust filters")
+    else:
         render_metric_card(
             "Maximum Energy Savings",
             f"{filtered['energy_saving_pct'].max():.2f}%",
             f"Within MRED <= {max_mred:.2f}",
         )
+
+with metric_col_3:
+    if filtered.empty:
+        render_metric_card("Maximum Area Savings", "-", "Adjust filters")
+    else:
         render_metric_card(
             "Maximum Area Savings",
             f"{filtered['area_saving_pct'].max():.2f}%",
             f"Within MRED <= {max_mred:.2f}",
         )
 
-    render_legend(selected_variants)
-    st.markdown(
-        """
-        <div class="decision-note">
-        <strong>Decision rule:</strong><br>
-        filter by acceptable error first, then rank candidates by energy,
-        area, or balanced score.
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+if filtered.empty:
+    st.warning("No architectures match the selected filters.")
+else:
+    energy_col, area_col = st.columns(2, gap="large")
 
-with chart_col:
-    st.markdown(
-        '<p style="color:#475569;font-size:0.9rem;margin:0 0 0.7rem 0;">Each point represents one architecture. The best region is upper-left: lower error and higher savings.</p>',
-        unsafe_allow_html=True,
-    )
-
-    if filtered.empty:
-        st.warning("No architectures match the selected filters.")
-    else:
+    with energy_col:
         with st.container(border=True):
             st.markdown(
                 """
                 <p class="chart-title">Energy Savings (%) vs Error (MRED)</p>
-                <p class="chart-subtitle">Architectures with controlled error and energy-saving trade-offs.</p>
+                <p class="chart-subtitle">Energy view: controlled error with higher power reduction.</p>
                 """,
                 unsafe_allow_html=True,
             )
@@ -426,11 +512,12 @@ with chart_col:
                 use_container_width=True,
             )
 
+    with area_col:
         with st.container(border=True):
             st.markdown(
                 """
                 <p class="chart-title">Area Savings (%) vs Error (MRED)</p>
-                <p class="chart-subtitle">Architectures with controlled error and circuit-area trade-offs.</p>
+                <p class="chart-subtitle">Area view: controlled error with smaller circuit footprint.</p>
                 """,
                 unsafe_allow_html=True,
             )
