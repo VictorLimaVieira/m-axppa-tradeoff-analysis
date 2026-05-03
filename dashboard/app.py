@@ -21,6 +21,29 @@ COLOR_SEQUENCE = [
     "#2F4858",
 ]
 
+VARIANT_COLORS = {
+    "AxPPA": "#1E88E5",
+    "COPY": "#2F3A9E",
+    "HOERAA": "#F07A3F",
+    "LDCA": "#8E1A8C",
+    "LOA": "#D946A8",
+    "LZTA": "#7E63D6",
+    "M-AxPPA-COPY": "#D9A300",
+    "M-AxPPA-LOA": "#E45756",
+    "M-AxPPA-TRUNC": "#197A80",
+    "M-HEAA": "#2FAD66",
+    "TRUNC": "#22B8D8",
+}
+
+DEFAULT_VARIANTS = [
+    "M-AxPPA-COPY",
+    "M-AxPPA-LOA",
+    "M-AxPPA-TRUNC",
+    "AxPPA",
+    "LOA",
+    "TRUNC",
+]
+
 
 st.set_page_config(
     page_title="M-AxPPA Trade-off Explorer",
@@ -89,6 +112,38 @@ st.markdown(
         border: 1px solid #d9dee7;
         border-radius: 8px;
     }
+    .legend-card {
+        background: #ffffff;
+        border: 1px solid #d9dee7;
+        border-radius: 8px;
+        padding: 0.85rem 1rem;
+        margin-top: 0.8rem;
+    }
+    .legend-card h3 {
+        font-size: 0.95rem;
+        margin: 0 0 0.55rem 0;
+        color: #20242a;
+    }
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        margin: 0.22rem 0;
+        color: #334155;
+        font-size: 0.86rem;
+    }
+    .legend-dot {
+        width: 0.72rem;
+        height: 0.72rem;
+        border-radius: 999px;
+        display: inline-block;
+        flex: 0 0 auto;
+    }
+    .section-label {
+        color: #64748b;
+        font-size: 0.86rem;
+        margin: -0.25rem 0 0.75rem 0;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -111,7 +166,7 @@ def build_scatter(
         x="mred",
         y=y,
         color="variant",
-        color_discrete_sequence=COLOR_SEQUENCE,
+        color_discrete_map=VARIANT_COLORS,
         hover_data={
             "family": True,
             "variant": True,
@@ -146,6 +201,27 @@ def build_scatter(
     return fig
 
 
+def render_variant_legend(variants: list[str]) -> None:
+    items = "\n".join(
+        f"""
+        <div class="legend-item">
+          <span class="legend-dot" style="background:{VARIANT_COLORS.get(variant, '#64748B')}"></span>
+          <span>{variant}</span>
+        </div>
+        """
+        for variant in variants
+    )
+    st.markdown(
+        f"""
+        <div class="legend-card">
+          <h3>Variant colors</h3>
+          {items}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 if not DATASET_PATH.exists():
     st.error(
         "Dataset not found. Run: python src/data_generation/generate_synthetic_data.py"
@@ -168,16 +244,36 @@ st.markdown(
 with st.sidebar:
     st.header("Filters")
 
+    all_variants = sorted(df["variant"].unique())
+    default_variants = [
+        variant for variant in DEFAULT_VARIANTS if variant in all_variants
+    ]
+
     families = st.multiselect(
         "Family",
         sorted(df["family"].unique()),
         default=sorted(df["family"].unique()),
     )
-    variants = st.multiselect(
-        "Variant",
-        sorted(df["variant"].unique()),
-        default=sorted(df["variant"].unique()),
+
+    variant_mode = st.radio(
+        "Variant selection",
+        ["Focused", "All", "Custom"],
+        horizontal=True,
+        help="Focused keeps the main M-AxPPA variants plus key baselines.",
     )
+
+    if variant_mode == "Focused":
+        variants = default_variants
+        st.caption("Focused view: M-AxPPA variants and key baselines.")
+    elif variant_mode == "All":
+        variants = all_variants
+    else:
+        variants = st.multiselect(
+            "Choose variants",
+            all_variants,
+            default=default_variants,
+        )
+
     max_mred = st.slider(
         "Maximum MRED",
         min_value=0.0,
@@ -199,6 +295,8 @@ with st.sidebar:
         value=0.0,
         step=1.0,
     )
+
+    render_variant_legend(variants)
 
 filtered = df[
     df["family"].isin(families)
@@ -229,6 +327,10 @@ overview_tab, ranking_tab, pareto_tab, data_tab = st.tabs(
 )
 
 with overview_tab:
+    st.markdown(
+        '<p class="section-label">Each point represents one architecture. The best region is upper-left: lower error and higher savings.</p>',
+        unsafe_allow_html=True,
+    )
     left, right = st.columns(2)
 
     with left:
@@ -273,7 +375,7 @@ with ranking_tab:
         x=ranking_metric,
         y="label",
         color="variant",
-        color_discrete_sequence=COLOR_SEQUENCE,
+        color_discrete_map=VARIANT_COLORS,
         orientation="h",
         title=f"Top architectures by {ranking_metric}",
     )
@@ -342,4 +444,3 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
-
