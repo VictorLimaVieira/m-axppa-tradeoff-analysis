@@ -8,6 +8,12 @@ The goal is to analyze approximate adder architectures and answer one central qu
 
 ![Power BI dashboard preview](reports/figures/dashboard_v1.png)
 
+## Live Dashboard
+
+Access the interactive Streamlit dashboard:
+
+[Open live app](https://m-axppa-tradeoff-analysis.streamlit.app/)
+
 ## Project Status
 
 This is a public portfolio V1.
@@ -180,4 +186,3 @@ The project is designed to demonstrate the data workflow and can be extended wit
 - Add Pareto frontier analysis.
 - Improve the Power BI dashboard with a second page for ranking.
 - Translate supporting documentation to English.
-
