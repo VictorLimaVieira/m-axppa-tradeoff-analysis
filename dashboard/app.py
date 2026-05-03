@@ -101,6 +101,31 @@ st.markdown(
         color: #111827;
         font-weight: 700;
     }
+    .metric-card {
+        background: #ffffff;
+        border: 1px solid #d9dee7;
+        border-radius: 8px;
+        padding: 1rem 1.1rem;
+        margin-bottom: 0.9rem;
+        min-height: 104px;
+    }
+    .metric-card .metric-label {
+        color: #20242a;
+        font-size: 0.95rem;
+        font-weight: 650;
+        margin-bottom: 0.45rem;
+    }
+    .metric-card .metric-value {
+        color: #111827;
+        font-size: 2rem;
+        line-height: 1.15;
+        font-weight: 700;
+        margin-bottom: 0.2rem;
+    }
+    .metric-card .metric-detail {
+        color: #64748b;
+        font-size: 0.84rem;
+    }
     div[data-testid="stPlotlyChart"] {
         background: #ffffff;
         border: 1px solid #d9dee7;
@@ -118,6 +143,8 @@ st.markdown(
         border-radius: 8px;
         padding: 0.85rem 1rem;
         margin-top: 0.8rem;
+        max-height: 318px;
+        overflow-y: auto;
     }
     .legend-card h3 {
         font-size: 0.95rem;
@@ -143,6 +170,16 @@ st.markdown(
         color: #64748b;
         font-size: 0.86rem;
         margin: -0.25rem 0 0.75rem 0;
+    }
+    .dashboard-note {
+        background: #ffffff;
+        border: 1px solid #d9dee7;
+        border-radius: 8px;
+        color: #475569;
+        font-size: 0.86rem;
+        line-height: 1.4;
+        padding: 0.9rem 1rem;
+        margin-top: 0.9rem;
     }
     </style>
     """,
@@ -180,10 +217,11 @@ def build_scatter(
         title=title,
     )
     fig.update_layout(
-        height=390,
+        height=335,
         paper_bgcolor="#ffffff",
         plot_bgcolor="#ffffff",
-        margin=dict(l=10, r=10, t=52, b=10),
+        margin=dict(l=10, r=10, t=48, b=10),
+        showlegend=False,
         legend_title_text="Variant",
         font=dict(color="#20242a", family="Segoe UI"),
         title=dict(font=dict(size=16)),
@@ -199,6 +237,19 @@ def build_scatter(
         zeroline=False,
     )
     return fig
+
+
+def render_metric_card(label: str, value: str, detail: str) -> None:
+    st.markdown(
+        f"""
+        <div class="metric-card">
+          <div class="metric-label">{label}</div>
+          <div class="metric-value">{value}</div>
+          <div class="metric-detail">{detail}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def render_variant_legend(variants: list[str]) -> None:
@@ -296,8 +347,6 @@ with st.sidebar:
         step=1.0,
     )
 
-    render_variant_legend(variants)
-
 filtered = df[
     df["family"].isin(families)
     & df["variant"].isin(variants)
@@ -310,20 +359,8 @@ if filtered.empty:
     st.warning("No architectures match the selected filters.")
     st.stop()
 
-metric_cols = st.columns(4)
-metric_cols[0].metric("Displayed Architectures", f"{len(filtered):,.0f}")
-metric_cols[1].metric(
-    "Maximum Energy Savings",
-    f"{filtered['energy_saving_pct'].max():.2f}%",
-)
-metric_cols[2].metric(
-    "Maximum Area Savings",
-    f"{filtered['area_saving_pct'].max():.2f}%",
-)
-metric_cols[3].metric("Lowest MRED", f"{filtered['mred'].min():.4f}")
-
 overview_tab, ranking_tab, pareto_tab, data_tab = st.tabs(
-    ["Overview", "Rankings", "Pareto", "Data"]
+    ["Dashboard", "Rankings", "Pareto", "Data"]
 )
 
 with overview_tab:
@@ -331,9 +368,9 @@ with overview_tab:
         '<p class="section-label">Each point represents one architecture. The best region is upper-left: lower error and higher savings.</p>',
         unsafe_allow_html=True,
     )
-    left, right = st.columns(2)
+    chart_col, side_col = st.columns([2.15, 1], gap="large")
 
-    with left:
+    with chart_col:
         st.plotly_chart(
             build_scatter(
                 filtered,
@@ -344,7 +381,6 @@ with overview_tab:
             use_container_width=True,
         )
 
-    with right:
         st.plotly_chart(
             build_scatter(
                 filtered,
@@ -353,6 +389,39 @@ with overview_tab:
                 "Area savings (%)",
             ),
             use_container_width=True,
+        )
+
+    with side_col:
+        render_metric_card(
+            "Displayed Architectures",
+            f"{len(filtered):,.0f}",
+            "Architectures after current filters",
+        )
+        render_metric_card(
+            "Maximum Energy Savings",
+            f"{filtered['energy_saving_pct'].max():.2f}%",
+            f"Within MRED <= {max_mred:.2f}",
+        )
+        render_metric_card(
+            "Maximum Area Savings",
+            f"{filtered['area_saving_pct'].max():.2f}%",
+            f"Within MRED <= {max_mred:.2f}",
+        )
+        render_metric_card(
+            "Lowest Error",
+            f"{filtered['mred'].min():.4f}",
+            "Minimum MRED in the selected set",
+        )
+        render_variant_legend(variants)
+        st.markdown(
+            """
+            <div class="dashboard-note">
+            <strong>Decision rule:</strong><br>
+            filter by acceptable error first, then rank candidates by energy,
+            area, or balanced score.
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
 
 with ranking_tab:
