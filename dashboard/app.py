@@ -8,41 +8,19 @@ import streamlit as st
 ROOT = Path(__file__).resolve().parents[1]
 DATASET_PATH = ROOT / "data" / "processed" / "tradeoff_dataset.csv"
 
-COLOR_SEQUENCE = [
-    "#1E88E5",
-    "#10A37F",
-    "#F59E0B",
-    "#E45756",
-    "#6D5DF6",
-    "#00A6A6",
-    "#8E44AD",
-    "#64748B",
-    "#D946EF",
-    "#2F4858",
-]
-
 VARIANT_COLORS = {
-    "AxPPA": "#1E88E5",
-    "COPY": "#2F3A9E",
-    "HOERAA": "#F07A3F",
-    "LDCA": "#8E1A8C",
-    "LOA": "#D946A8",
-    "LZTA": "#7E63D6",
-    "M-AxPPA-COPY": "#D9A300",
-    "M-AxPPA-LOA": "#E45756",
-    "M-AxPPA-TRUNC": "#197A80",
-    "M-HEAA": "#2FAD66",
-    "TRUNC": "#22B8D8",
+    "AxPPA": "#2563EB",
+    "COPY": "#312E81",
+    "HOERAA": "#EA580C",
+    "LDCA": "#86198F",
+    "LOA": "#DB2777",
+    "LZTA": "#7C3AED",
+    "M-AxPPA-COPY": "#D97706",
+    "M-AxPPA-LOA": "#E11D48",
+    "M-AxPPA-TRUNC": "#0F766E",
+    "M-HEAA": "#16A34A",
+    "TRUNC": "#0891B2",
 }
-
-DEFAULT_VARIANTS = [
-    "M-AxPPA-COPY",
-    "M-AxPPA-LOA",
-    "M-AxPPA-TRUNC",
-    "AxPPA",
-    "LOA",
-    "TRUNC",
-]
 
 
 st.set_page_config(
@@ -55,23 +33,33 @@ st.set_page_config(
 st.markdown(
     """
     <style>
+    #MainMenu,
+    footer,
+    header,
+    [data-testid="stToolbar"],
+    [data-testid="stDecoration"],
+    [data-testid="stStatusWidget"] {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+    }
     .stApp {
         background: #f6f7f9;
         color: #20242a;
     }
     .block-container {
-        padding-top: 2rem;
+        padding-top: 1.45rem;
         padding-bottom: 2rem;
-        max-width: 1240px;
+        max-width: 1230px;
     }
     .hero {
         text-align: center;
-        margin-bottom: 1.25rem;
+        margin-bottom: 1.2rem;
     }
     .hero h1 {
-        font-size: 2.35rem;
-        line-height: 1.1;
-        margin-bottom: 0.35rem;
+        font-size: 2.25rem;
+        line-height: 1.08;
+        margin: 0 0 0.45rem 0;
         font-weight: 650;
         color: #20242a;
     }
@@ -80,106 +68,73 @@ st.markdown(
         font-size: 1rem;
         margin: 0;
     }
-    .note {
-        color: #64748b;
-        font-size: 0.82rem;
-        text-align: center;
-        margin-top: 1rem;
-    }
-    div[data-testid="stMetric"] {
-        background: #ffffff;
-        border: 1px solid #d9dee7;
-        border-radius: 8px;
-        padding: 1rem 1.1rem;
-        min-height: 112px;
-    }
-    div[data-testid="stMetricLabel"] {
-        color: #20242a;
-        font-weight: 650;
-    }
-    div[data-testid="stMetricValue"] {
-        color: #111827;
-        font-weight: 700;
-    }
-    .metric-card {
-        background: #ffffff;
-        border: 1px solid #d9dee7;
-        border-radius: 8px;
-        padding: 1rem 1.1rem;
-        margin-bottom: 0.9rem;
-        min-height: 104px;
-    }
-    .metric-card .metric-label {
-        color: #20242a;
-        font-size: 0.95rem;
-        font-weight: 650;
-        margin-bottom: 0.45rem;
-    }
-    .metric-card .metric-value {
-        color: #111827;
-        font-size: 2rem;
-        line-height: 1.15;
-        font-weight: 700;
-        margin-bottom: 0.2rem;
-    }
-    .metric-card .metric-detail {
-        color: #64748b;
-        font-size: 0.84rem;
-    }
     div[data-testid="stPlotlyChart"] {
         background: #ffffff;
         border: 1px solid #d9dee7;
         border-radius: 8px;
         padding: 0.4rem;
     }
-    .stDataFrame {
+    .metric-card {
         background: #ffffff;
         border: 1px solid #d9dee7;
         border-radius: 8px;
+        padding: 0.9rem 1rem;
+        margin-bottom: 0.8rem;
+        min-height: 96px;
     }
-    .legend-card {
+    .metric-label {
+        color: #20242a;
+        font-size: 0.92rem;
+        font-weight: 650;
+        margin-bottom: 0.38rem;
+    }
+    .metric-value {
+        color: #111827;
+        font-size: 1.85rem;
+        line-height: 1.15;
+        font-weight: 720;
+        margin-bottom: 0.16rem;
+    }
+    .metric-detail {
+        color: #64748b;
+        font-size: 0.82rem;
+    }
+    .panel {
         background: #ffffff;
         border: 1px solid #d9dee7;
         border-radius: 8px;
-        padding: 0.85rem 1rem;
-        margin-top: 0.8rem;
-        max-height: 318px;
-        overflow-y: auto;
+        padding: 0.95rem 1rem;
+        margin-bottom: 0.9rem;
     }
-    .legend-card h3 {
-        font-size: 0.95rem;
+    .panel h3 {
         margin: 0 0 0.55rem 0;
         color: #20242a;
+        font-size: 0.98rem;
+        font-weight: 650;
     }
-    .legend-item {
-        display: flex;
-        align-items: center;
-        gap: 0.45rem;
-        margin: 0.22rem 0;
-        color: #334155;
-        font-size: 0.86rem;
-    }
-    .legend-dot {
-        width: 0.72rem;
-        height: 0.72rem;
-        border-radius: 999px;
-        display: inline-block;
-        flex: 0 0 auto;
+    .panel-note {
+        color: #64748b;
+        font-size: 0.8rem;
+        margin: -0.15rem 0 0.55rem 0;
     }
     .section-label {
         color: #64748b;
         font-size: 0.86rem;
-        margin: -0.25rem 0 0.75rem 0;
+        margin: -0.2rem 0 0.72rem 0;
     }
-    .dashboard-note {
+    .footer-note {
+        border-top: 1px solid #d9dee7;
+        color: #64748b;
+        font-size: 0.82rem;
+        line-height: 1.4;
+        margin-top: 1.25rem;
+        padding-top: 0.8rem;
+        text-align: center;
+    }
+    .stDataFrame {
         background: #ffffff;
         border: 1px solid #d9dee7;
         border-radius: 8px;
-        color: #475569;
-        font-size: 0.86rem;
-        line-height: 1.4;
-        padding: 0.9rem 1rem;
-        margin-top: 0.9rem;
     }
     </style>
     """,
@@ -190,53 +145,6 @@ st.markdown(
 @st.cache_data
 def load_data() -> pd.DataFrame:
     return pd.read_csv(DATASET_PATH)
-
-
-def build_scatter(
-    data: pd.DataFrame,
-    y: str,
-    title: str,
-    y_label: str,
-) -> px.scatter:
-    fig = px.scatter(
-        data,
-        x="mred",
-        y=y,
-        color="variant",
-        color_discrete_map=VARIANT_COLORS,
-        hover_data={
-            "family": True,
-            "variant": True,
-            "m_bits": True,
-            "l_bits": True,
-            "k_bits": True,
-            "mred": ":.4f",
-            y: ":.2f",
-            "balanced_score": ":.3f",
-        },
-        title=title,
-    )
-    fig.update_layout(
-        height=335,
-        paper_bgcolor="#ffffff",
-        plot_bgcolor="#ffffff",
-        margin=dict(l=10, r=10, t=48, b=10),
-        showlegend=False,
-        legend_title_text="Variant",
-        font=dict(color="#20242a", family="Segoe UI"),
-        title=dict(font=dict(size=16)),
-    )
-    fig.update_xaxes(
-        title="Error (MRED)",
-        gridcolor="#e5e7eb",
-        zeroline=False,
-    )
-    fig.update_yaxes(
-        title=y_label,
-        gridcolor="#e5e7eb",
-        zeroline=False,
-    )
-    return fig
 
 
 def render_metric_card(label: str, value: str, detail: str) -> None:
@@ -252,25 +160,79 @@ def render_metric_card(label: str, value: str, detail: str) -> None:
     )
 
 
-def render_variant_legend(variants: list[str]) -> None:
-    items = "\n".join(
-        f"""
-        <div class="legend-item">
-          <span class="legend-dot" style="background:{VARIANT_COLORS.get(variant, '#64748B')}"></span>
-          <span>{variant}</span>
-        </div>
-        """
-        for variant in variants
+def build_scatter(
+    data: pd.DataFrame,
+    y: str,
+    title: str,
+    y_label: str,
+    selected_variants: list[str],
+) -> px.scatter:
+    fig = px.scatter(
+        data,
+        x="mred",
+        y=y,
+        color="variant",
+        color_discrete_map=VARIANT_COLORS,
+        category_orders={"variant": selected_variants},
+        hover_data={
+            "family": True,
+            "variant": True,
+            "m_bits": True,
+            "l_bits": True,
+            "k_bits": True,
+            "mred": ":.4f",
+            y: ":.2f",
+            "balanced_score": ":.3f",
+        },
+        title=title,
     )
-    st.markdown(
-        f"""
-        <div class="legend-card">
-          <h3>Variant colors</h3>
-          {items}
-        </div>
-        """,
-        unsafe_allow_html=True,
+    fig.update_traces(
+        marker={
+            "size": 8,
+            "opacity": 0.9,
+            "line": {"width": 0.6, "color": "#ffffff"},
+        }
     )
+    fig.update_layout(
+        height=328,
+        paper_bgcolor="#ffffff",
+        plot_bgcolor="#ffffff",
+        margin=dict(l=10, r=10, t=58, b=8),
+        font=dict(color="#20242a", family="Segoe UI"),
+        title=dict(font=dict(size=16, color="#20242a")),
+        legend={
+            "title": {"text": "Variant"},
+            "orientation": "h",
+            "yanchor": "bottom",
+            "y": 1.02,
+            "xanchor": "left",
+            "x": 0,
+            "font": {"size": 10, "color": "#334155"},
+            "itemsizing": "constant",
+        },
+    )
+    fig.update_xaxes(
+        title="Error (MRED)",
+        gridcolor="#e5e7eb",
+        zeroline=False,
+        range=[0, max(0.30, float(data["mred"].max()) * 1.08)],
+    )
+    fig.update_yaxes(
+        title=y_label,
+        gridcolor="#e5e7eb",
+        zeroline=False,
+        range=[0, 105],
+    )
+    return fig
+
+
+def architecture_label(row: pd.Series) -> str:
+    if row["family"] == "M-AxPPA":
+        return (
+            f"{row['variant']} | M={int(row['m_bits'])}, "
+            f"L={int(row['l_bits'])}, K={int(row['k_bits'])}"
+        )
+    return f"{row['variant']} | K={int(row['k_bits'])}"
 
 
 if not DATASET_PATH.exists():
@@ -281,6 +243,7 @@ if not DATASET_PATH.exists():
 
 
 df = load_data()
+all_variants = sorted(df["variant"].unique())
 
 st.markdown(
     """
@@ -292,106 +255,60 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-with st.sidebar:
-    st.header("Filters")
+chart_col, side_col = st.columns([2.05, 1], gap="large")
 
-    all_variants = sorted(df["variant"].unique())
-    default_variants = [
-        variant for variant in DEFAULT_VARIANTS if variant in all_variants
-    ]
+with side_col:
+    metric_slot = st.container()
 
-    families = st.multiselect(
-        "Family",
-        sorted(df["family"].unique()),
-        default=sorted(df["family"].unique()),
-    )
+    with st.container(border=True):
+        st.markdown("**Variant**")
+        st.caption("Select the architecture families shown in the charts.")
+        selected_variants = [
+            variant
+            for variant in all_variants
+            if st.checkbox(variant, value=True, key=f"variant_{variant}")
+        ]
 
-    variant_mode = st.radio(
-        "Variant selection",
-        ["Focused", "All", "Custom"],
-        horizontal=True,
-        help="Focused keeps the main M-AxPPA variants plus key baselines.",
-    )
-
-    if variant_mode == "Focused":
-        variants = default_variants
-        st.caption("Focused view: M-AxPPA variants and key baselines.")
-    elif variant_mode == "All":
-        variants = all_variants
-    else:
-        variants = st.multiselect(
-            "Choose variants",
-            all_variants,
-            default=default_variants,
+    with st.container(border=True):
+        st.markdown("**Thresholds**")
+        max_mred = st.slider(
+            "Maximum MRED",
+            min_value=0.0,
+            max_value=1.0,
+            value=0.25,
+            step=0.01,
+        )
+        min_energy = st.slider(
+            "Minimum energy savings (%)",
+            min_value=0.0,
+            max_value=100.0,
+            value=0.0,
+            step=1.0,
+        )
+        min_area = st.slider(
+            "Minimum area savings (%)",
+            min_value=0.0,
+            max_value=100.0,
+            value=0.0,
+            step=1.0,
         )
 
-    max_mred = st.slider(
-        "Maximum MRED",
-        min_value=0.0,
-        max_value=1.0,
-        value=0.25,
-        step=0.01,
-    )
-    min_energy = st.slider(
-        "Minimum energy savings (%)",
-        min_value=0.0,
-        max_value=100.0,
-        value=0.0,
-        step=1.0,
-    )
-    min_area = st.slider(
-        "Minimum area savings (%)",
-        min_value=0.0,
-        max_value=100.0,
-        value=0.0,
-        step=1.0,
-    )
+if not selected_variants:
+    selected_variants = all_variants
 
 filtered = df[
-    df["family"].isin(families)
-    & df["variant"].isin(variants)
+    df["variant"].isin(selected_variants)
     & (df["mred"] <= max_mred)
     & (df["energy_saving_pct"] >= min_energy)
     & (df["area_saving_pct"] >= min_area)
 ].copy()
 
-if filtered.empty:
-    st.warning("No architectures match the selected filters.")
-    st.stop()
-
-overview_tab, ranking_tab, pareto_tab, data_tab = st.tabs(
-    ["Dashboard", "Rankings", "Pareto", "Data"]
-)
-
-with overview_tab:
-    st.markdown(
-        '<p class="section-label">Each point represents one architecture. The best region is upper-left: lower error and higher savings.</p>',
-        unsafe_allow_html=True,
-    )
-    chart_col, side_col = st.columns([2.15, 1], gap="large")
-
-    with chart_col:
-        st.plotly_chart(
-            build_scatter(
-                filtered,
-                "energy_saving_pct",
-                "Energy Savings vs Error",
-                "Energy savings (%)",
-            ),
-            use_container_width=True,
-        )
-
-        st.plotly_chart(
-            build_scatter(
-                filtered,
-                "area_saving_pct",
-                "Area Savings vs Error",
-                "Area savings (%)",
-            ),
-            use_container_width=True,
-        )
-
-    with side_col:
+with metric_slot:
+    if filtered.empty:
+        render_metric_card("Displayed Architectures", "0", "No rows match filters")
+        render_metric_card("Maximum Energy Savings", "-", "Adjust filters")
+        render_metric_card("Maximum Area Savings", "-", "Adjust filters")
+    else:
         render_metric_card(
             "Displayed Architectures",
             f"{len(filtered):,.0f}",
@@ -407,109 +324,122 @@ with overview_tab:
             f"{filtered['area_saving_pct'].max():.2f}%",
             f"Within MRED <= {max_mred:.2f}",
         )
-        render_metric_card(
-            "Lowest Error",
-            f"{filtered['mred'].min():.4f}",
-            "Minimum MRED in the selected set",
+
+with chart_col:
+    st.markdown(
+        '<p class="section-label">Each point represents one architecture. The best region is upper-left: lower error and higher savings.</p>',
+        unsafe_allow_html=True,
+    )
+    if filtered.empty:
+        st.warning("No architectures match the selected filters.")
+    else:
+        st.plotly_chart(
+            build_scatter(
+                filtered,
+                "energy_saving_pct",
+                "Energy Savings (%) vs Error (MRED)",
+                "Energy savings (%)",
+                selected_variants,
+            ),
+            use_container_width=True,
         )
-        render_variant_legend(variants)
-        st.markdown(
-            """
-            <div class="dashboard-note">
-            <strong>Decision rule:</strong><br>
-            filter by acceptable error first, then rank candidates by energy,
-            area, or balanced score.
-            </div>
-            """,
-            unsafe_allow_html=True,
+        st.plotly_chart(
+            build_scatter(
+                filtered,
+                "area_saving_pct",
+                "Area Savings (%) vs Error (MRED)",
+                "Area savings (%)",
+                selected_variants,
+            ),
+            use_container_width=True,
         )
 
-with ranking_tab:
-    ranking_metric = st.radio(
-        "Ranking criterion",
-        ["balanced_score", "energy_saving_pct", "area_saving_pct", "mred"],
-        horizontal=True,
-    )
-    ascending = ranking_metric == "mred"
-    top = filtered.sort_values(ranking_metric, ascending=ascending).head(15).copy()
-    top["label"] = top.apply(
-        lambda row: f"{row['variant']} | M={row['m_bits']}, L={row['l_bits']}, K={row['k_bits']}"
-        if row["family"] == "M-AxPPA"
-        else f"{row['variant']} | K={row['k_bits']}",
-        axis=1,
-    )
+if not filtered.empty:
+    ranking_tab, pareto_tab, data_tab = st.tabs(["Rankings", "Pareto", "Data"])
 
-    fig_rank = px.bar(
-        top,
-        x=ranking_metric,
-        y="label",
-        color="variant",
-        color_discrete_map=VARIANT_COLORS,
-        orientation="h",
-        title=f"Top architectures by {ranking_metric}",
-    )
-    fig_rank.update_layout(
-        height=540,
-        paper_bgcolor="#ffffff",
-        plot_bgcolor="#ffffff",
-        margin=dict(l=10, r=10, t=52, b=10),
-        yaxis={"categoryorder": "total ascending"},
-        font=dict(color="#20242a", family="Segoe UI"),
-    )
-    fig_rank.update_xaxes(gridcolor="#e5e7eb")
-    fig_rank.update_yaxes(title="")
-    st.plotly_chart(fig_rank, use_container_width=True)
+    with ranking_tab:
+        ranking_metric = st.radio(
+            "Ranking criterion",
+            ["balanced_score", "energy_saving_pct", "area_saving_pct", "mred"],
+            horizontal=True,
+        )
+        ascending = ranking_metric == "mred"
+        top = filtered.sort_values(ranking_metric, ascending=ascending).head(15).copy()
+        top["label"] = top.apply(architecture_label, axis=1)
 
-with pareto_tab:
-    pareto = filtered[
-        (filtered["pareto_optimal_energy_error"] == 1)
-        | (filtered["pareto_optimal_area_error"] == 1)
-    ]
-    fig_pareto = build_scatter(
-        filtered,
-        "energy_saving_pct",
-        "Pareto Candidates: Energy Savings vs Error",
-        "Energy savings (%)",
-    )
-    fig_pareto.update_traces(opacity=0.45)
-    fig_pareto.add_scatter(
-        x=pareto["mred"],
-        y=pareto["energy_saving_pct"],
-        mode="markers",
-        marker={"size": 11, "symbol": "diamond", "color": "#111827"},
-        name="Pareto candidate",
-    )
-    st.plotly_chart(fig_pareto, use_container_width=True)
+        fig_rank = px.bar(
+            top,
+            x=ranking_metric,
+            y="label",
+            color="variant",
+            color_discrete_map=VARIANT_COLORS,
+            category_orders={"variant": selected_variants},
+            orientation="h",
+            title=f"Top architectures by {ranking_metric}",
+        )
+        fig_rank.update_layout(
+            height=540,
+            paper_bgcolor="#ffffff",
+            plot_bgcolor="#ffffff",
+            margin=dict(l=10, r=10, t=52, b=10),
+            yaxis={"categoryorder": "total ascending"},
+            font=dict(color="#20242a", family="Segoe UI"),
+        )
+        fig_rank.update_xaxes(gridcolor="#e5e7eb")
+        fig_rank.update_yaxes(title="")
+        st.plotly_chart(fig_rank, use_container_width=True)
 
-with data_tab:
-    columns = [
-        "family",
-        "variant",
-        "m_bits",
-        "l_bits",
-        "k_bits",
-        "ssim",
-        "ncc",
-        "mae",
-        "mre",
-        "mred",
-        "energy_saving_pct",
-        "area_saving_pct",
-        "balanced_score",
-        "selected_for_synthesis",
-    ]
-    st.dataframe(
-        filtered[columns].sort_values("balanced_score", ascending=False),
-        use_container_width=True,
-        hide_index=True,
-    )
+    with pareto_tab:
+        pareto = filtered[
+            (filtered["pareto_optimal_energy_error"] == 1)
+            | (filtered["pareto_optimal_area_error"] == 1)
+        ]
+        fig_pareto = build_scatter(
+            filtered,
+            "energy_saving_pct",
+            "Pareto Candidates: Energy Savings (%) vs Error (MRED)",
+            "Energy savings (%)",
+            selected_variants,
+        )
+        fig_pareto.update_traces(opacity=0.42)
+        fig_pareto.add_scatter(
+            x=pareto["mred"],
+            y=pareto["energy_saving_pct"],
+            mode="markers",
+            marker={"size": 11, "symbol": "diamond", "color": "#111827"},
+            name="Pareto candidate",
+        )
+        st.plotly_chart(fig_pareto, use_container_width=True)
+
+    with data_tab:
+        columns = [
+            "family",
+            "variant",
+            "m_bits",
+            "l_bits",
+            "k_bits",
+            "ssim",
+            "ncc",
+            "mae",
+            "mre",
+            "mred",
+            "energy_saving_pct",
+            "area_saving_pct",
+            "balanced_score",
+            "selected_for_synthesis",
+        ]
+        st.dataframe(
+            filtered[columns].sort_values("balanced_score", ascending=False),
+            use_container_width=True,
+            hide_index=True,
+        )
 
 st.markdown(
     """
-    <p class="note">
+    <div class="footer-note">
     Synthetic data based on the public M-AxPPA paper structure. Values demonstrate
     the analysis workflow and do not represent real hardware measurements.
-    </p>
+    </div>
     """,
     unsafe_allow_html=True,
 )
