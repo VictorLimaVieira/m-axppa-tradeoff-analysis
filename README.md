@@ -14,6 +14,33 @@ Access the interactive Streamlit dashboard:
 
 [Open live app](https://m-axppa-tradeoff-analysis.streamlit.app/)
 
+## Power BI Analysis
+
+This project includes a Power BI dashboard designed to compare approximate
+adder architectures by:
+
+- energy savings;
+- area savings;
+- error threshold;
+- architecture variant;
+- balanced trade-off score.
+
+The dashboard was built from a curated Excel dataset generated with Python.
+This makes the project useful both as an engineering analysis and as a BI
+portfolio case.
+
+## Analytical Questions
+
+The analysis is guided by decision-oriented questions:
+
+1. Which architectures maximize energy savings under `MRED <= 0.10`?
+2. Which architectures maximize area savings under `MRED <= 0.10`?
+3. Which variants dominate the Pareto frontier?
+4. How does the best architecture change when the decision criterion changes?
+5. Which configurations offer the best balanced trade-off?
+
+Full page: [`docs/analytical_questions.md`](docs/analytical_questions.md)
+
 ## Project Status
 
 This is a public portfolio V1.
@@ -40,6 +67,7 @@ Current unpublished research involving DCT is intentionally excluded from this r
 - SQL analysis with SQLite.
 - Python data generation and preparation.
 - Multi-objective trade-off analysis.
+- Pareto candidate analysis for error-energy and error-area decisions.
 - Power BI dashboard design.
 - Streamlit interactive dashboard.
 - Technical storytelling for data portfolio.
@@ -55,6 +83,9 @@ An architecture can maximize energy savings but produce too much error. Another 
 2. Rank the remaining candidates by energy savings, area savings, or balanced score.
 3. Compare architecture families and approximation strategies.
 ```
+
+The project also highlights **Pareto candidates** to identify architectures
+that are not dominated in error-energy and error-area trade-offs.
 
 ## Dashboard
 
@@ -91,6 +122,7 @@ database/
 dashboard/
   app.py              Streamlit dashboard
 docs/
+  analytical_questions.md
   resumo_do_artigo.md
   metodologia_dados_sinteticos.md
 powerbi/
@@ -142,12 +174,21 @@ This creates:
 Example:
 
 ```bash
-python src/run_query.py database/queries/02_energia_com_erro_controlado.sql
+python src/run_query.py database/queries/03_energia_mred_010.sql
 ```
 
 Example question:
 
 > Which architectures maximize energy savings while keeping `MRED <= 0.10`?
+
+Related queries:
+
+```text
+database/queries/02_energia_mred_005.sql
+database/queries/03_energia_mred_010.sql
+database/queries/05_candidatas_pareto.sql
+database/queries/06_melhor_area_mred_010.sql
+```
 
 ## How To Run The Streamlit Dashboard
 
@@ -181,8 +222,7 @@ The project is designed to demonstrate the data workflow and can be extended wit
 
 ## Next Steps
 
-- Deploy the Streamlit dashboard.
+- Improve Streamlit dashboard layout and add documentation for the deployed version.
 - Add Python notebooks for exploratory data analysis.
-- Add Pareto frontier analysis.
 - Improve the Power BI dashboard with a second page for ranking.
 - Translate supporting documentation to English.
