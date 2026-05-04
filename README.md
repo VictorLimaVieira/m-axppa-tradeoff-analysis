@@ -131,7 +131,6 @@ powerbi/
   theme_m_axppa_tradeoff.json
 portfolio/
   estudo_de_caso_v1.md
-  curriculo_linkedin.md
 src/
   data_generation/
     generate_synthetic_data.py

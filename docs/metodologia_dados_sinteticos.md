@@ -2,7 +2,7 @@
 
 ## Por Que Usar Dados Sinteticos?
 
-No momento, o projeto possui apenas o poster e o artigo publico. Como nem todos os dados experimentais completos estao disponiveis para divulgacao, o primeiro MVP usa dados sinteticos.
+No momento, os dados experimentais completos nao estao disponiveis para divulgacao publica. Por isso, a primeira versao do projeto usa dados sinteticos baseados no poster, no artigo publico e na estrutura descrita da arquitetura M-AxPPA.
 
 Esses dados nao representam medicoes reais de hardware. Eles servem para:
 
@@ -40,4 +40,3 @@ Use:
 > no dataset sintetico, esta arquitetura aparece como melhor candidata sob este criterio.
 
 Quando dados reais puderem ser divulgados, esta metodologia deve ser atualizada.
-
