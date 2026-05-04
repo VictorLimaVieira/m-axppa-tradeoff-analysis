@@ -17,7 +17,7 @@ def format_value(value: object) -> str:
 
 def main() -> None:
     if len(sys.argv) != 2:
-        print("Uso: python src/run_query.py database/queries/02_energia_com_erro_controlado.sql")
+        print("Uso: python src/run_query.py database/queries/03_energia_mred_010.sql")
         raise SystemExit(1)
 
     query_path = ROOT / sys.argv[1]
@@ -46,4 +46,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
