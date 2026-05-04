@@ -52,10 +52,10 @@ Essas candidatas mostram a historia central do projeto:
 
 ## Proxima Analise
 
-A proxima etapa e criar notebooks para:
+As proximas etapas sao:
 
-- visualizar a distribuicao de erro por variante;
-- comparar `COPY`, `TRUNC` e `LOA`;
-- construir a fronteira de Pareto;
-- estudar como `M`, `L` e `K` influenciam erro, energia e area.
-
+- expandir o notebook de EDA com mais visualizacoes;
+- aprofundar a comparacao entre `COPY`, `TRUNC` e `LOA`;
+- analisar como `M`, `L` e `K` influenciam erro, energia e area;
+- evoluir a visualizacao dos candidatos de Pareto;
+- transformar os principais achados em uma segunda pagina do Power BI.
