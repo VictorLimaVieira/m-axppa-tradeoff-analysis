@@ -121,6 +121,9 @@ database/
   queries/            SQL analysis queries
 dashboard/
   app.py              Streamlit dashboard
+notebooks/
+  01_exploratory_data_analysis.ipynb
+  README.md
 docs/
   analytical_questions.md
   resumo_do_artigo.md
@@ -189,6 +192,17 @@ database/queries/05_candidatas_pareto.sql
 database/queries/06_melhor_area_mred_010.sql
 ```
 
+## Exploratory Data Analysis
+
+The project includes an initial EDA notebook:
+
+```text
+notebooks/01_exploratory_data_analysis.ipynb
+```
+
+It explores the processed dataset, architecture mix, controlled-error
+candidates under `MRED <= 0.10`, and Pareto flags.
+
 ## How To Run The Streamlit Dashboard
 
 Install dependencies:
@@ -221,7 +235,7 @@ The project is designed to demonstrate the data workflow and can be extended wit
 
 ## Next Steps
 
-- Improve Streamlit dashboard layout and add documentation for the deployed version.
-- Add Python notebooks for exploratory data analysis.
+- Add usage documentation for the deployed Streamlit version.
+- Extend the EDA notebook with more statistical views.
 - Improve the Power BI dashboard with a second page for ranking.
-- Translate supporting documentation to English.
+- Translate remaining supporting documentation to English.

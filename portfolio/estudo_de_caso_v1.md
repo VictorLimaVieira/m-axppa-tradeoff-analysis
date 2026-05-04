@@ -1,118 +1,134 @@
-# Estudo de Caso V1 - Analise de Trade-offs em Computacao Aproximada
+# Case Study V1 - Approximate Computing Trade-off Analysis
 
-## Contexto
+## Context
 
-Computacao aproximada e uma estrategia usada para reduzir consumo de energia, area de hardware e custo computacional aceitando pequenos erros controlados. Essa abordagem e especialmente relevante em aplicacoes tolerantes a erro, como processamento de imagens, videos, sinais e alguns cenarios de inteligencia artificial.
+Approximate computing is a strategy used to reduce energy consumption,
+hardware area, and computational cost by accepting small controlled errors.
+This approach is especially relevant in error-tolerant applications such as
+image processing, video processing, signal processing, and some artificial
+intelligence workloads.
 
-Este projeto foi inspirado em um artigo publico sobre **M-AxPPA: Modified Approximate Parallel Prefix Adder**, apresentado em contexto academico. A proposta do portfolio nao e reivindicar autoria sobre a arquitetura original, mas transformar o problema tecnico em um estudo de dados.
+This project was inspired by a public paper about **M-AxPPA: Modified
+Approximate Parallel Prefix Adder**, presented in an academic context. The
+portfolio goal is not to claim authorship of the original architecture, but to
+translate the technical problem into a data analysis case study.
 
-## Problema De Dados
+## Data Problem
 
-A pergunta central do projeto e:
+The central question is:
 
-> Dado um conjunto de arquiteturas aproximadas, quais configuracoes oferecem o melhor equilibrio entre erro, economia de energia e economia de area?
+> Given a set of approximate architectures, which configurations provide the
+> best balance between error, energy savings, and area savings?
 
-Essa pergunta e um problema classico de decisao com multiplos objetivos. Uma arquitetura pode economizar muita energia, mas gerar erro alto. Outra pode ter erro baixo, mas economia menor.
+This is a classic multi-objective decision problem. One architecture may save a
+large amount of energy while producing high error. Another may preserve
+accuracy while saving less area.
 
-## Dados
+## Data
 
-Como os dados experimentais completos ainda nao estao disponiveis para divulgacao, a V1 usa dados sinteticos baseados na estrutura publica do artigo.
+Because the complete experimental data is not available for public disclosure,
+V1 uses synthetic data based on the public structure described in the paper.
 
-O dataset contem:
+The dataset contains:
 
-- 315 arquiteturas M-AxPPA;
-- 128 arquiteturas baseline da literatura;
-- 443 arquiteturas no total;
-- metricas de erro e qualidade, como `SSIM`, `NCC`, `MAE`, `MRE` e `MRED`;
-- metricas de sintese, como economia de energia e economia de area.
+- 315 M-AxPPA architectures;
+- 128 literature baseline architectures;
+- 443 architectures in total;
+- error and quality metrics, such as `SSIM`, `NCC`, `MAE`, `MRE`, and `MRED`;
+- synthesis metrics, such as energy savings and area savings.
 
-Os dados sinteticos foram usados para demonstrar o fluxo analitico, nao para afirmar resultados reais de hardware.
+The synthetic data is used to demonstrate the analytical workflow, not to claim
+real hardware measurements.
 
-## Metodo
+## Method
 
-O projeto foi dividido em seis etapas:
+The project was organized into six stages:
 
-1. Geracao e organizacao dos dados.
-2. Modelagem em banco SQLite.
-3. Consultas SQL para responder perguntas de ranking e restricao.
-4. Preparacao de dataset para dashboard em Power BI.
-5. Construcao de dashboard no Power BI para comparar erro, energia e area.
-6. Publicacao de dashboard interativo em Streamlit para exploracao online.
+1. Generate and organize the data.
+2. Model the data in a SQLite database.
+3. Write SQL queries to answer ranking and filtering questions.
+4. Prepare a curated dataset for Power BI.
+5. Build a Power BI dashboard to compare error, energy, and area.
+6. Publish an interactive Streamlit dashboard for online exploration.
 
-A principal logica de analise foi:
+The main analytical logic is:
 
 ```text
-Primeiro filtrar arquiteturas com erro aceitavel.
-Depois ranquear por energia, area ou score balanceado.
+First, filter architectures by acceptable error.
+Then, rank the remaining candidates by energy, area, or balanced score.
 ```
 
-Tambem foram marcadas candidatas de Pareto para destacar arquiteturas que nao
-sao dominadas nas relacoes erro-energia e erro-area.
+Pareto candidates were also flagged to highlight architectures that are not
+dominated in the error-energy and error-area trade-offs.
 
-## Entregaveis Da V1
+## V1 Deliverables
 
-A primeira versao publica do projeto inclui:
+The first public version of the project includes:
 
-- dataset sintetico estruturado para analise;
-- banco SQLite com schema relacional;
-- consultas SQL para rankings, filtros de erro e candidatas de Pareto;
-- dataset Excel/CSV preparado para Power BI;
-- dashboard no Power BI com comparacoes de energia, area, erro e variantes;
-- print do dashboard no README;
-- dashboard interativo publicado em Streamlit;
-- documentacao de perguntas analiticas para aproximar o projeto de um caso de BI.
+- synthetic dataset structured for analysis;
+- SQLite database with a relational schema;
+- SQL queries for rankings, error filters, and Pareto candidates;
+- Excel/CSV dataset prepared for Power BI;
+- Power BI dashboard comparing energy, area, error, and variants;
+- dashboard screenshot in the README;
+- deployed Streamlit dashboard;
+- analytical questions documentation to frame the project as a BI case.
 
-## Resultados Iniciais
+## Initial Results
 
-No dataset sintetico, quando filtramos arquiteturas com `MRED <= 0.10`, aparecem candidatas com alta economia de energia e erro controlado.
+In the synthetic dataset, when architectures are filtered by `MRED <= 0.10`,
+some candidates show high energy savings with controlled error.
 
-Exemplo de candidata forte para energia:
+Example of a strong energy-saving candidate:
 
 ```text
 M-AxPPA-LOA, M=1, L=1, K=14
 MRED: 0.0828
-Economia de energia: 91.44%
-Economia de area: 59.26%
+Energy savings: 91.44%
+Area savings: 59.26%
 ```
 
-Exemplo de candidata equilibrada:
+Example of a balanced candidate:
 
 ```text
 M-AxPPA-LOA, M=2, L=1, K=13
 MRED: 0.0710
-Economia de energia: 88.62%
-Economia de area: 60.93%
+Energy savings: 88.62%
+Area savings: 60.93%
 ```
 
-Ao mudar o objetivo de energia para area, o ranking muda. Isso mostra que a melhor arquitetura depende da pergunta de negocio ou engenharia.
+When the objective changes from energy to area, the ranking changes. This shows
+that the best architecture depends on the business or engineering question.
 
-A analise de Pareto reforca esse ponto: algumas arquiteturas sao relevantes
-porque entregam maior economia com erro controlado, enquanto outras sao
-preferiveis quando a prioridade e reduzir area. A decisao final depende do
-criterio escolhido para a aplicacao.
+The Pareto analysis reinforces this point: some architectures are relevant
+because they deliver higher savings with controlled error, while others become
+more attractive when the priority is area reduction. The final decision depends
+on the criterion selected for the application.
 
-## Aprendizados De Dados
+## Data Skills Demonstrated
 
-Este projeto demonstra:
+This project demonstrates:
 
-- modelagem de dados experimentais;
-- consultas SQL com `JOIN`, `WHERE`, `ORDER BY` e filtros;
-- analise de trade-off entre metricas conflitantes;
-- analise multiobjetivo com candidatas de Pareto;
-- preparacao de dataset para BI;
-- dashboard em Power BI;
-- dashboard interativo em Streamlit;
-- storytelling tecnico para tomada de decisao.
+- experimental data modeling;
+- SQL queries with `JOIN`, `WHERE`, `ORDER BY`, and filters;
+- trade-off analysis between conflicting metrics;
+- multi-objective analysis with Pareto candidates;
+- dataset preparation for BI;
+- Power BI dashboard design;
+- Streamlit dashboard deployment;
+- technical storytelling for decision-making.
 
-## Limitacoes
+## Limitations
 
-Os resultados da V1 usam dados sinteticos. Eles sao uteis para demonstrar analise, mas nao devem ser interpretados como medicoes reais.
+The V1 results use synthetic data. They are useful for demonstrating the
+analysis workflow, but they should not be interpreted as real hardware
+measurements.
 
-Uma versao futura pode substituir ou complementar esses dados com resultados experimentais reais, caso eles possam ser divulgados.
+A future version may replace or complement this dataset with real experimental
+data if public disclosure becomes possible.
 
-## Proximos Passos
+## Next Steps
 
-- Criar notebooks em Python para analise exploratoria.
-- Melhorar a documentacao da versao publicada em Streamlit.
-- Evoluir o dashboard Power BI com uma segunda pagina para ranking.
-- Traduzir o estudo de caso para ingles.
+- Extend the exploratory data analysis notebook with more statistical views.
+- Improve documentation for the deployed Streamlit version.
+- Evolve the Power BI dashboard with a second ranking page.

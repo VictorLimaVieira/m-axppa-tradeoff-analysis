@@ -7,7 +7,7 @@ import streamlit as st
 
 ROOT = Path(__file__).resolve().parents[1]
 DATASET_PATH = ROOT / "data" / "processed" / "tradeoff_dataset.csv"
-DEFAULT_MAX_MRED = 0.25
+DEFAULT_MAX_MRED = 0.10
 
 VARIANT_COLORS = {
     "AxPPA": "#2563EB",
@@ -107,6 +107,11 @@ st.markdown(
         font-size: 0.8rem;
         line-height: 1.35;
         margin: -0.1rem 0 0.75rem 0;
+    }
+
+    .filter-divider {
+        border-top: 1px solid #d8dee8;
+        margin: 0.75rem 0;
     }
 
     .variant-dot-wrap {
@@ -239,6 +244,13 @@ st.markdown(
         font-size: 0.88rem !important;
     }
 
+    [data-testid="stSlider"] label,
+    [data-testid="stSlider"] label p,
+    [data-testid="stSlider"] p {
+        color: #334155 !important;
+        font-size: 0.86rem !important;
+    }
+
     [data-testid="stRadio"] label,
     [data-testid="stRadio"] label p,
     [data-testid="stRadio"] div[role="radiogroup"] label p {
@@ -316,8 +328,8 @@ def build_scatter(
     y: str,
     y_label: str,
     selected_variants: list[str],
+    x_limit: float,
 ) -> px.scatter:
-    max_x = max(0.30, float(data["mred"].max()) * 1.08)
     fig = px.scatter(
         data,
         x="mred",
@@ -357,7 +369,7 @@ def build_scatter(
         tickfont={"color": "#475569", "size": 11},
         gridcolor="#dfe4ec",
         zeroline=False,
-        range=[0, max_x],
+        range=[0, max(0.01, x_limit)],
     )
     fig.update_yaxes(
         title=y_label,
@@ -415,7 +427,7 @@ with variant_col:
     with st.container(border=True):
         st.markdown('<p class="filter-title">Variant</p>', unsafe_allow_html=True)
         st.markdown(
-            f'<p class="filter-note">Select the architecture variants shown in the charts. Charts keep MRED <= {DEFAULT_MAX_MRED:.2f} for readable trade-offs.</p>',
+            '<p class="filter-note">Select the architecture variants shown in the charts.</p>',
             unsafe_allow_html=True,
         )
         selected_variants = []
@@ -433,13 +445,23 @@ with variant_col:
             with check_col:
                 if st.checkbox(variant, value=True, key=f"variant_{variant}"):
                     selected_variants.append(variant)
+        st.markdown('<div class="filter-divider"></div>', unsafe_allow_html=True)
+        max_mred = st.slider(
+            "Maximum MRED",
+            min_value=0.00,
+            max_value=0.30,
+            value=DEFAULT_MAX_MRED,
+            step=0.01,
+            format="%.2f",
+            help="Use a lower limit for stricter error tolerance.",
+        )
 
 if not selected_variants:
     selected_variants = all_variants
 
 filtered = df[
     df["variant"].isin(selected_variants)
-    & (df["mred"] <= DEFAULT_MAX_MRED)
+    & (df["mred"] <= max_mred)
 ].copy()
 
 with content_col:
@@ -461,7 +483,7 @@ with content_col:
             render_metric_card(
                 "Maximum Energy Savings",
                 f"{filtered['energy_saving_pct'].max():.2f}%",
-                f"Within MRED <= {DEFAULT_MAX_MRED:.2f}",
+                f"Within MRED <= {max_mred:.2f}",
             )
 
     with metric_col_3:
@@ -471,7 +493,7 @@ with content_col:
             render_metric_card(
                 "Maximum Area Savings",
                 f"{filtered['area_saving_pct'].max():.2f}%",
-                f"Within MRED <= {DEFAULT_MAX_MRED:.2f}",
+                f"Within MRED <= {max_mred:.2f}",
             )
 
     if filtered.empty:
@@ -494,6 +516,7 @@ with content_col:
                         "energy_saving_pct",
                         "Energy savings (%)",
                         selected_variants,
+                        max_mred,
                     ),
                     use_container_width=True,
                 )
@@ -513,6 +536,7 @@ with content_col:
                         "area_saving_pct",
                         "Area savings (%)",
                         selected_variants,
+                        max_mred,
                     ),
                     use_container_width=True,
                 )
@@ -570,6 +594,7 @@ if not filtered.empty:
             "energy_saving_pct",
             "Energy savings (%)",
             selected_variants,
+            max_mred,
         )
         fig_pareto.update_traces(opacity=0.35)
         fig_pareto.add_scatter(

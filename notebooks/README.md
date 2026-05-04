@@ -1,16 +1,22 @@
 # Notebooks
 
-Os notebooks ainda serao criados. A ordem sugerida e:
+Current notebook:
 
-1. `01_entendimento_dos_dados.ipynb`
-2. `02_analise_de_acuracia.ipynb`
-3. `03_analise_de_tradeoff.ipynb`
-4. `04_modelagem_estatistica.ipynb`
-5. `05_relatorio_de_decisao.ipynb`
+1. `01_exploratory_data_analysis.ipynb`
 
-Enquanto eles nao existem, use:
+The first notebook introduces the processed synthetic dataset, checks the main
+metrics, compares architecture variants, and explores controlled-error
+candidates under `MRED <= 0.10`.
 
-- `database/queries/` para praticar SQL;
-- `dashboard/app.py` para explorar visualmente;
-- `reports/primeiras_descobertas.md` para entender a primeira narrativa.
+Future notebook ideas:
 
+1. `02_accuracy_analysis.ipynb`
+2. `03_tradeoff_modeling.ipynb`
+3. `04_statistical_modeling.ipynb`
+4. `05_decision_report.ipynb`
+
+For complementary analysis, use:
+
+- `database/queries/` for SQL practice;
+- `dashboard/app.py` for visual exploration;
+- `reports/primeiras_descobertas.md` for the first narrative notes.
