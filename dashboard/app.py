@@ -239,6 +239,12 @@ st.markdown(
         font-size: 0.88rem !important;
     }
 
+    [data-testid="stRadio"] label,
+    [data-testid="stRadio"] label p,
+    [data-testid="stRadio"] div[role="radiogroup"] label p {
+        color: #111827 !important;
+    }
+
     [data-testid="stCheckbox"] {
         margin-bottom: -0.35rem;
     }
@@ -539,11 +545,19 @@ if not filtered.empty:
             paper_bgcolor="#ffffff",
             plot_bgcolor="#ffffff",
             margin=dict(l=10, r=10, t=52, b=10),
+            legend={
+                "title": {"font": {"color": "#111827", "size": 12}},
+                "font": {"color": "#111827", "size": 11},
+            },
             yaxis={"categoryorder": "total ascending"},
             font=dict(color="#1f2937", family="Segoe UI"),
         )
-        fig_rank.update_xaxes(gridcolor="#dfe4ec", tickfont={"color": "#475569"})
-        fig_rank.update_yaxes(title="", tickfont={"color": "#475569"})
+        fig_rank.update_xaxes(
+            gridcolor="#dfe4ec",
+            title_font={"color": "#111827", "size": 12},
+            tickfont={"color": "#111827", "size": 11},
+        )
+        fig_rank.update_yaxes(title="", tickfont={"color": "#111827", "size": 11})
         st.plotly_chart(fig_rank, use_container_width=True)
 
     with pareto_tab:
