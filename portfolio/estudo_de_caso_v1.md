@@ -30,12 +30,14 @@ Os dados sinteticos foram usados para demonstrar o fluxo analitico, nao para afi
 
 ## Metodo
 
-O projeto foi dividido em quatro etapas:
+O projeto foi dividido em seis etapas:
 
 1. Geracao e organizacao dos dados.
 2. Modelagem em banco SQLite.
 3. Consultas SQL para responder perguntas de ranking e restricao.
 4. Preparacao de dataset para dashboard em Power BI.
+5. Construcao de dashboard no Power BI para comparar erro, energia e area.
+6. Publicacao de dashboard interativo em Streamlit para exploracao online.
 
 A principal logica de analise foi:
 
@@ -43,6 +45,22 @@ A principal logica de analise foi:
 Primeiro filtrar arquiteturas com erro aceitavel.
 Depois ranquear por energia, area ou score balanceado.
 ```
+
+Tambem foram marcadas candidatas de Pareto para destacar arquiteturas que nao
+sao dominadas nas relacoes erro-energia e erro-area.
+
+## Entregaveis Da V1
+
+A primeira versao publica do projeto inclui:
+
+- dataset sintetico estruturado para analise;
+- banco SQLite com schema relacional;
+- consultas SQL para rankings, filtros de erro e candidatas de Pareto;
+- dataset Excel/CSV preparado para Power BI;
+- dashboard no Power BI com comparacoes de energia, area, erro e variantes;
+- print do dashboard no README;
+- dashboard interativo publicado em Streamlit;
+- documentacao de perguntas analiticas para aproximar o projeto de um caso de BI.
 
 ## Resultados Iniciais
 
@@ -68,6 +86,11 @@ Economia de area: 60.93%
 
 Ao mudar o objetivo de energia para area, o ranking muda. Isso mostra que a melhor arquitetura depende da pergunta de negocio ou engenharia.
 
+A analise de Pareto reforca esse ponto: algumas arquiteturas sao relevantes
+porque entregam maior economia com erro controlado, enquanto outras sao
+preferiveis quando a prioridade e reduzir area. A decisao final depende do
+criterio escolhido para a aplicacao.
+
 ## Aprendizados De Dados
 
 Este projeto demonstra:
@@ -75,7 +98,10 @@ Este projeto demonstra:
 - modelagem de dados experimentais;
 - consultas SQL com `JOIN`, `WHERE`, `ORDER BY` e filtros;
 - analise de trade-off entre metricas conflitantes;
+- analise multiobjetivo com candidatas de Pareto;
 - preparacao de dataset para BI;
+- dashboard em Power BI;
+- dashboard interativo em Streamlit;
 - storytelling tecnico para tomada de decisao.
 
 ## Limitacoes
@@ -86,9 +112,7 @@ Uma versao futura pode substituir ou complementar esses dados com resultados exp
 
 ## Proximos Passos
 
-- Criar dashboard no Power BI.
-- Adicionar prints do dashboard ao README.
 - Criar notebooks em Python para analise exploratoria.
-- Implementar fronteira de Pareto.
+- Melhorar a documentacao da versao publicada em Streamlit.
+- Evoluir o dashboard Power BI com uma segunda pagina para ranking.
 - Traduzir o estudo de caso para ingles.
-
