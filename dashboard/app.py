@@ -26,7 +26,6 @@ VARIANT_COLORS = {
 
 st.set_page_config(
     page_title="M-AxPPA Trade-off Explorer",
-    page_icon="",
     layout="wide",
 )
 
@@ -518,7 +517,7 @@ with content_col:
                         selected_variants,
                         max_mred,
                     ),
-                    width="stretch",
+                    use_container_width=True,
                 )
 
         with area_col:
@@ -538,7 +537,7 @@ with content_col:
                         selected_variants,
                         max_mred,
                     ),
-                    width="stretch",
+                    use_container_width=True,
                 )
 
 if not filtered.empty:
@@ -582,7 +581,7 @@ if not filtered.empty:
             tickfont={"color": "#111827", "size": 11},
         )
         fig_rank.update_yaxes(title="", tickfont={"color": "#111827", "size": 11})
-        st.plotly_chart(fig_rank, width="stretch")
+        st.plotly_chart(fig_rank, use_container_width=True)
 
     with pareto_tab:
         pareto = filtered[
@@ -604,7 +603,7 @@ if not filtered.empty:
             marker={"size": 11, "symbol": "diamond", "color": "#111827"},
             name="Pareto candidate",
         )
-        st.plotly_chart(fig_pareto, width="stretch")
+        st.plotly_chart(fig_pareto, use_container_width=True)
 
     with data_tab:
         columns = [
@@ -625,7 +624,7 @@ if not filtered.empty:
         ]
         st.dataframe(
             filtered[columns].sort_values("balanced_score", ascending=False),
-            width="stretch",
+            use_container_width=True,
             hide_index=True,
         )
 
