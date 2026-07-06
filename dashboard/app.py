@@ -7,6 +7,7 @@ import streamlit as st
 
 ROOT = Path(__file__).resolve().parents[1]
 DATASET_PATH = ROOT / "data" / "processed" / "tradeoff_dataset.csv"
+COPY_VARIANTS_PATH = ROOT / "data" / "processed" / "copy_variants_accuracy.csv"
 DEFAULT_MAX_MRED = 0.10
 
 VARIANT_COLORS = {
@@ -17,11 +18,20 @@ VARIANT_COLORS = {
     "LOA": "#DB2777",
     "LZTA": "#7C3AED",
     "M-AxPPA-COPY": "#D97706",
+    "M-AxPPA-COPY_B": "#92400E",
+    "M-AxPPA-COPY_AB": "#2563EB",
+    "M-AxPPA-COPY_BA": "#059669",
     "M-AxPPA-LOA": "#E11D48",
     "M-AxPPA-TRUNC": "#0F766E",
     "M-HEAA": "#16A34A",
     "TRUNC": "#0891B2",
 }
+
+COPY_VARIANT_ORDER = [
+    "M-AxPPA-COPY_B",
+    "M-AxPPA-COPY_AB",
+    "M-AxPPA-COPY_BA",
+]
 
 
 st.set_page_config(
@@ -288,6 +298,13 @@ def load_data() -> pd.DataFrame:
     return pd.read_csv(DATASET_PATH)
 
 
+@st.cache_data
+def load_copy_variants() -> pd.DataFrame:
+    if not COPY_VARIANTS_PATH.exists():
+        return pd.DataFrame()
+    return pd.read_csv(COPY_VARIANTS_PATH).sort_values(["config_index", "variant"])
+
+
 def render_metric_card(label: str, value: str, detail: str) -> None:
     st.markdown(
         f"""
@@ -381,6 +398,58 @@ def build_scatter(
     return fig
 
 
+def build_copy_variant_line(data: pd.DataFrame, y: str, y_label: str) -> px.line:
+    fig = px.line(
+        data,
+        x="config_index",
+        y=y,
+        color="variant",
+        color_discrete_map=VARIANT_COLORS,
+        category_orders={"variant": COPY_VARIANT_ORDER},
+        log_x=True,
+        hover_data={
+            "variant": True,
+            "m_bits": True,
+            "l_bits": True,
+            "k_bits": True,
+            "ssim": ":.6f",
+            "ssim_error": ":.6f",
+        },
+    )
+    fig.update_traces(line={"width": 2.3})
+    fig.update_layout(
+        height=360,
+        paper_bgcolor="#ffffff",
+        plot_bgcolor="#ffffff",
+        margin=dict(l=8, r=8, t=8, b=8),
+        legend={
+            "orientation": "h",
+            "yanchor": "bottom",
+            "y": 1.02,
+            "xanchor": "left",
+            "x": 0,
+            "title": None,
+            "font": {"color": "#111827", "size": 11},
+        },
+        font=dict(color="#1f2937", family="Segoe UI"),
+    )
+    fig.update_xaxes(
+        title="Configuration index",
+        title_font={"color": "#1f2937", "size": 12},
+        tickfont={"color": "#475569", "size": 11},
+        gridcolor="#dfe4ec",
+        zeroline=False,
+    )
+    fig.update_yaxes(
+        title=y_label,
+        title_font={"color": "#1f2937", "size": 12},
+        tickfont={"color": "#475569", "size": 11},
+        gridcolor="#dfe4ec",
+        zeroline=False,
+    )
+    return fig
+
+
 def architecture_label(row: pd.Series) -> str:
     if row["family"] == "M-AxPPA":
         return (
@@ -398,6 +467,7 @@ if not DATASET_PATH.exists():
 
 
 df = load_data()
+copy_variants_df = load_copy_variants()
 all_variants = sorted(df["variant"].unique())
 
 st.markdown(
@@ -541,7 +611,13 @@ with content_col:
                 )
 
 if not filtered.empty:
-    ranking_tab, pareto_tab, data_tab = st.tabs(["Rankings", "Pareto", "Data"])
+    if copy_variants_df.empty:
+        ranking_tab, pareto_tab, data_tab = st.tabs(["Rankings", "Pareto", "Data"])
+        copy_tab = None
+    else:
+        ranking_tab, pareto_tab, copy_tab, data_tab = st.tabs(
+            ["Rankings", "Pareto", "COPY Variants", "Data"]
+        )
 
     with ranking_tab:
         ranking_metric = st.radio(
@@ -604,6 +680,52 @@ if not filtered.empty:
             name="Pareto candidate",
         )
         st.plotly_chart(fig_pareto, use_container_width=True)
+
+    if copy_tab is not None:
+        with copy_tab:
+            copy_view = copy_variants_df[
+                copy_variants_df["variant"].isin(COPY_VARIANT_ORDER)
+            ].copy()
+            copy_view["variant"] = pd.Categorical(
+                copy_view["variant"],
+                categories=COPY_VARIANT_ORDER,
+                ordered=True,
+            )
+
+            accuracy_col, error_col = st.columns(2, gap="large")
+            with accuracy_col:
+                with st.container(border=True):
+                    st.markdown(
+                        """
+                        <p class="chart-title">COPY Variant Accuracy</p>
+                        <p class="chart-subtitle">MATLAB SSIM from main.m.</p>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                    st.plotly_chart(
+                        build_copy_variant_line(copy_view, "ssim", "SSIM"),
+                        use_container_width=True,
+                    )
+
+            with error_col:
+                with st.container(border=True):
+                    st.markdown(
+                        """
+                        <p class="chart-title">COPY Variant Error</p>
+                        <p class="chart-subtitle">Error computed as 1 - SSIM.</p>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                    st.plotly_chart(
+                        build_copy_variant_line(copy_view, "ssim_error", "1 - SSIM"),
+                        use_container_width=True,
+                    )
+
+            st.dataframe(
+                copy_view.sort_values(["config_index", "variant"]),
+                use_container_width=True,
+                hide_index=True,
+            )
 
     with data_tab:
         columns = [
