@@ -518,7 +518,7 @@ with content_col:
                         selected_variants,
                         max_mred,
                     ),
-                    use_container_width=True,
+                    width="stretch",
                 )
 
         with area_col:
@@ -538,7 +538,7 @@ with content_col:
                         selected_variants,
                         max_mred,
                     ),
-                    use_container_width=True,
+                    width="stretch",
                 )
 
 if not filtered.empty:
@@ -582,7 +582,7 @@ if not filtered.empty:
             tickfont={"color": "#111827", "size": 11},
         )
         fig_rank.update_yaxes(title="", tickfont={"color": "#111827", "size": 11})
-        st.plotly_chart(fig_rank, use_container_width=True)
+        st.plotly_chart(fig_rank, width="stretch")
 
     with pareto_tab:
         pareto = filtered[
@@ -604,7 +604,7 @@ if not filtered.empty:
             marker={"size": 11, "symbol": "diamond", "color": "#111827"},
             name="Pareto candidate",
         )
-        st.plotly_chart(fig_pareto, use_container_width=True)
+        st.plotly_chart(fig_pareto, width="stretch")
 
     with data_tab:
         columns = [
@@ -625,7 +625,7 @@ if not filtered.empty:
         ]
         st.dataframe(
             filtered[columns].sort_values("balanced_score", ascending=False),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
