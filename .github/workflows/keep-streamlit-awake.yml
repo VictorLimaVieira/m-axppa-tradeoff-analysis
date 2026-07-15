@@ -10,7 +10,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Visit deployed app
+        shell: bash
         run: |
-          curl --fail --location --retry 3 --retry-delay 10 \
-            https://m-axppa-tradeoff-analysis.streamlit.app/ \
-            --output /dev/null
+          app_url="https://m-axppa-tradeoff-analysis.streamlit.app/"
+
+          for attempt in 1 2 3; do
+            http_code="$(
+              curl --location --silent --show-error \
+                --max-time 45 \
+                --retry 2 \
+                --retry-delay 10 \
+                --output /tmp/streamlit-ping.html \
+                --write-out "%{http_code}" \
+                "$app_url"
+            )"
+            curl_exit=$?
+
+            echo "Attempt ${attempt}: curl_exit=${curl_exit}, http_code=${http_code}"
+
+            if [[ "$curl_exit" -eq 0 && "$http_code" =~ ^(2|3)[0-9][0-9]$ ]]; then
+              echo "Streamlit app responded successfully."
+              exit 0
+            fi
+
+            sleep 20
+          done
+
+          echo "::warning::Streamlit ping did not return HTTP 2xx/3xx after retries. Keeping workflow green to avoid noisy scheduled notifications."
+          exit 0
