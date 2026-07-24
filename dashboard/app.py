@@ -7,16 +7,25 @@ import streamlit as st
 
 ROOT = Path(__file__).resolve().parents[1]
 DATASET_PATH = ROOT / "data" / "processed" / "tradeoff_dataset.csv"
-COPY_VARIANTS_PATH = ROOT / "data" / "processed" / "copy_variants_accuracy.csv"
+HYBRID_VARIANTS_PATH = ROOT / "data" / "processed" / "hybrid_variants_accuracy.csv"
 DEFAULT_MAX_MRED = 0.10
 
 VARIANT_COLORS = {
     "AxPPA": "#2563EB",
     "COPY": "#1E3A8A",
+    "COPY B": "#92400E",
+    "COPY AB": "#2563EB",
+    "COPY BA": "#059669",
+    "ETA": "#0EA5E9",
+    "HEAA": "#84CC16",
+    "HERLOA": "#F97316",
+    "HOAANED": "#BE123C",
     "HOERAA": "#EA580C",
     "LDCA": "#86198F",
     "LOA": "#DB2777",
     "LZTA": "#7C3AED",
+    "MHEAA": "#16A34A",
+    "MHERLOA": "#A16207",
     "M-AxPPA-COPY": "#D97706",
     "M-AxPPA-COPY_B": "#92400E",
     "M-AxPPA-COPY_AB": "#2563EB",
@@ -24,13 +33,31 @@ VARIANT_COLORS = {
     "M-AxPPA-LOA": "#E11D48",
     "M-AxPPA-TRUNC": "#0F766E",
     "M-HEAA": "#16A34A",
+    "OLOCA": "#0891B2",
+    "SETA": "#4F46E5",
     "TRUNC": "#0891B2",
+    "TRUNC 1": "#475569",
 }
 
-COPY_VARIANT_ORDER = [
-    "M-AxPPA-COPY_B",
-    "M-AxPPA-COPY_AB",
-    "M-AxPPA-COPY_BA",
+HYBRID_VARIANT_ORDER = [
+    "COPY",
+    "LOA",
+    "TRUNC",
+    "COPY B",
+    "COPY AB",
+    "COPY BA",
+    "TRUNC 1",
+    "LZTA",
+    "HOERAA",
+    "MHEAA",
+    "HERLOA",
+    "HEAA",
+    "ETA",
+    "SETA",
+    "OLOCA",
+    "MHERLOA",
+    "LDCA",
+    "HOAANED",
 ]
 
 
@@ -299,10 +326,10 @@ def load_data() -> pd.DataFrame:
 
 
 @st.cache_data
-def load_copy_variants() -> pd.DataFrame:
-    if not COPY_VARIANTS_PATH.exists():
+def load_hybrid_variants() -> pd.DataFrame:
+    if not HYBRID_VARIANTS_PATH.exists():
         return pd.DataFrame()
-    return pd.read_csv(COPY_VARIANTS_PATH).sort_values(["config_index", "variant"])
+    return pd.read_csv(HYBRID_VARIANTS_PATH).sort_values(["config_index", "variant"])
 
 
 def render_metric_card(label: str, value: str, detail: str) -> None:
@@ -398,14 +425,14 @@ def build_scatter(
     return fig
 
 
-def build_copy_variant_line(data: pd.DataFrame, y: str, y_label: str) -> px.line:
+def build_hybrid_variant_line(data: pd.DataFrame, y: str, y_label: str) -> px.line:
     fig = px.line(
         data,
         x="config_index",
         y=y,
         color="variant",
         color_discrete_map=VARIANT_COLORS,
-        category_orders={"variant": COPY_VARIANT_ORDER},
+        category_orders={"variant": HYBRID_VARIANT_ORDER},
         log_x=True,
         hover_data={
             "variant": True,
@@ -416,9 +443,9 @@ def build_copy_variant_line(data: pd.DataFrame, y: str, y_label: str) -> px.line
             "ssim_error": ":.6f",
         },
     )
-    fig.update_traces(line={"width": 2.3})
+    fig.update_traces(line={"width": 2.15})
     fig.update_layout(
-        height=360,
+        height=430,
         paper_bgcolor="#ffffff",
         plot_bgcolor="#ffffff",
         margin=dict(l=8, r=8, t=8, b=8),
@@ -429,7 +456,7 @@ def build_copy_variant_line(data: pd.DataFrame, y: str, y_label: str) -> px.line
             "xanchor": "left",
             "x": 0,
             "title": None,
-            "font": {"color": "#111827", "size": 11},
+            "font": {"color": "#111827", "size": 10},
         },
         font=dict(color="#1f2937", family="Segoe UI"),
     )
@@ -467,7 +494,7 @@ if not DATASET_PATH.exists():
 
 
 df = load_data()
-copy_variants_df = load_copy_variants()
+hybrid_variants_df = load_hybrid_variants()
 all_variants = sorted(df["variant"].unique())
 
 st.markdown(
@@ -611,12 +638,12 @@ with content_col:
                 )
 
 if not filtered.empty:
-    if copy_variants_df.empty:
+    if hybrid_variants_df.empty:
         ranking_tab, pareto_tab, data_tab = st.tabs(["Rankings", "Pareto", "Data"])
-        copy_tab = None
+        hybrid_tab = None
     else:
-        ranking_tab, pareto_tab, copy_tab, data_tab = st.tabs(
-            ["Rankings", "Pareto", "COPY Variants", "Data"]
+        ranking_tab, pareto_tab, hybrid_tab, data_tab = st.tabs(
+            ["Rankings", "Pareto", "MATLAB Hybrids", "Data"]
         )
 
     with ranking_tab:
@@ -681,14 +708,28 @@ if not filtered.empty:
         )
         st.plotly_chart(fig_pareto, use_container_width=True)
 
-    if copy_tab is not None:
-        with copy_tab:
-            copy_view = copy_variants_df[
-                copy_variants_df["variant"].isin(COPY_VARIANT_ORDER)
+    if hybrid_tab is not None:
+        with hybrid_tab:
+            hybrid_available = [
+                variant
+                for variant in HYBRID_VARIANT_ORDER
+                if variant in set(hybrid_variants_df["variant"])
+            ]
+            selected_hybrid_variants = st.multiselect(
+                "Hybrid variants",
+                options=hybrid_available,
+                default=hybrid_available,
+                help="TRUNC B, TRUNC AB and TRUNC BA were removed because they duplicate the COPY variants.",
+            )
+            if not selected_hybrid_variants:
+                selected_hybrid_variants = hybrid_available
+
+            hybrid_view = hybrid_variants_df[
+                hybrid_variants_df["variant"].isin(selected_hybrid_variants)
             ].copy()
-            copy_view["variant"] = pd.Categorical(
-                copy_view["variant"],
-                categories=COPY_VARIANT_ORDER,
+            hybrid_view["variant"] = pd.Categorical(
+                hybrid_view["variant"],
+                categories=HYBRID_VARIANT_ORDER,
                 ordered=True,
             )
 
@@ -697,13 +738,13 @@ if not filtered.empty:
                 with st.container(border=True):
                     st.markdown(
                         """
-                        <p class="chart-title">COPY Variant Accuracy</p>
-                        <p class="chart-subtitle">MATLAB SSIM from main.m.</p>
+                        <p class="chart-title">Hybrid Accuracy</p>
+                        <p class="chart-subtitle">MATLAB SSIM exported from main.m.</p>
                         """,
                         unsafe_allow_html=True,
                     )
                     st.plotly_chart(
-                        build_copy_variant_line(copy_view, "ssim", "SSIM"),
+                        build_hybrid_variant_line(hybrid_view, "ssim", "SSIM"),
                         use_container_width=True,
                     )
 
@@ -711,18 +752,18 @@ if not filtered.empty:
                 with st.container(border=True):
                     st.markdown(
                         """
-                        <p class="chart-title">COPY Variant Error</p>
+                        <p class="chart-title">Hybrid Error</p>
                         <p class="chart-subtitle">Error computed as 1 - SSIM.</p>
                         """,
                         unsafe_allow_html=True,
                     )
                     st.plotly_chart(
-                        build_copy_variant_line(copy_view, "ssim_error", "1 - SSIM"),
+                        build_hybrid_variant_line(hybrid_view, "ssim_error", "1 - SSIM"),
                         use_container_width=True,
                     )
 
             st.dataframe(
-                copy_view.sort_values(["config_index", "variant"]),
+                hybrid_view.sort_values(["config_index", "variant"]),
                 use_container_width=True,
                 hide_index=True,
             )
