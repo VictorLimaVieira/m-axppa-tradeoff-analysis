@@ -8,9 +8,13 @@ import streamlit as st
 ROOT = Path(__file__).resolve().parents[1]
 DATASET_PATH = ROOT / "data" / "processed" / "tradeoff_dataset.csv"
 HYBRID_VARIANTS_PATH = ROOT / "data" / "processed" / "hybrid_variants_accuracy.csv"
+MAXPPA_COMPLETE_RESULTS_PATH = (
+    ROOT / "data" / "processed" / "maxppa_complete_results.csv"
+)
 DEFAULT_MAX_MRED = 0.10
 
 VARIANT_COLORS = {
+    "APROX5": "#0F766E",
     "AxPPA": "#2563EB",
     "COPY": "#1E3A8A",
     "COPY B": "#92400E",
@@ -20,6 +24,7 @@ VARIANT_COLORS = {
     "HEAA": "#84CC16",
     "HERLOA": "#F97316",
     "HOAANED": "#BE123C",
+    "HOERRA": "#DC2626",
     "HOERAA": "#EA580C",
     "LDCA": "#86198F",
     "LOA": "#DB2777",
@@ -58,6 +63,24 @@ HYBRID_VARIANT_ORDER = [
     "MHERLOA",
     "LDCA",
     "HOAANED",
+]
+
+MAXPPA_VARIANT_ORDER = [
+    "APROX5",
+    "COPY",
+    "ETA",
+    "HERLOA",
+    "HOAANED",
+    "HOERRA",
+    "LDCA",
+    "LOA",
+    "LZTA",
+    "MHEAA",
+    "MHERLOA",
+    "OLOCA",
+    "SETA",
+    "TRUNC",
+    "HEAA",
 ]
 
 
@@ -332,6 +355,15 @@ def load_hybrid_variants() -> pd.DataFrame:
     return pd.read_csv(HYBRID_VARIANTS_PATH).sort_values(["config_index", "variant"])
 
 
+@st.cache_data
+def load_maxppa_complete_results() -> pd.DataFrame:
+    if not MAXPPA_COMPLETE_RESULTS_PATH.exists():
+        return pd.DataFrame()
+    return pd.read_csv(MAXPPA_COMPLETE_RESULTS_PATH).sort_values(
+        ["variant", "config_index"]
+    )
+
+
 def render_metric_card(label: str, value: str, detail: str) -> None:
     st.markdown(
         f"""
@@ -477,6 +509,108 @@ def build_hybrid_variant_line(data: pd.DataFrame, y: str, y_label: str) -> px.li
     return fig
 
 
+def build_maxppa_complete_scatter(
+    data: pd.DataFrame,
+    y: str,
+    y_label: str,
+    selected_variants: list[str],
+) -> px.scatter:
+    fig = px.scatter(
+        data,
+        x="mred",
+        y=y,
+        color="variant",
+        color_discrete_map=VARIANT_COLORS,
+        category_orders={"variant": selected_variants},
+        hover_data={
+            "architecture": True,
+            "variant": True,
+            "m_bits": True,
+            "l_bits": True,
+            "k_bits": True,
+            "mred": ":.6f",
+            y: ":.3f",
+            "ppa_gain_pct": ":.2f",
+        },
+    )
+    fig.update_traces(
+        marker={
+            "size": 7.5,
+            "opacity": 0.86,
+            "line": {"width": 0.45, "color": "#ffffff"},
+        }
+    )
+    fig.update_layout(
+        height=390,
+        showlegend=False,
+        paper_bgcolor="#ffffff",
+        plot_bgcolor="#ffffff",
+        margin=dict(l=8, r=8, t=8, b=8),
+        font=dict(color="#1f2937", family="Segoe UI"),
+    )
+    fig.update_xaxes(
+        title="Error (MRED)",
+        title_font={"color": "#1f2937", "size": 12},
+        tickfont={"color": "#475569", "size": 11},
+        gridcolor="#dfe4ec",
+        zeroline=False,
+    )
+    fig.update_yaxes(
+        title=y_label,
+        title_font={"color": "#1f2937", "size": 12},
+        tickfont={"color": "#475569", "size": 11},
+        gridcolor="#dfe4ec",
+        zeroline=False,
+    )
+    return fig
+
+
+def build_maxppa_rank_bar(data: pd.DataFrame, metric: str, label: str) -> px.bar:
+    top = data.sort_values(metric, ascending=False).head(15).copy()
+    top["label"] = top.apply(
+        lambda row: (
+            f"{row['variant']} | M={int(row['m_bits'])}, "
+            f"L={int(row['l_bits'])}, K={int(row['k_bits'])}"
+        ),
+        axis=1,
+    )
+    fig = px.bar(
+        top,
+        x=metric,
+        y="label",
+        color="variant",
+        color_discrete_map=VARIANT_COLORS,
+        category_orders={"variant": MAXPPA_VARIANT_ORDER},
+        orientation="h",
+        hover_data={
+            "architecture": True,
+            "mred": ":.6f",
+            "total_power_reduction_pct": ":.2f",
+            "total_area_reduction_pct": ":.2f",
+            "critical_delay_ns": ":.3f",
+            "ppa_gain_pct": ":.2f",
+        },
+    )
+    fig.update_layout(
+        height=520,
+        showlegend=False,
+        paper_bgcolor="#ffffff",
+        plot_bgcolor="#ffffff",
+        margin=dict(l=8, r=8, t=8, b=8),
+        yaxis={"categoryorder": "total ascending"},
+        font=dict(color="#1f2937", family="Segoe UI"),
+    )
+    fig.update_xaxes(
+        title=label,
+        title_font={"color": "#1f2937", "size": 12},
+        tickfont={"color": "#475569", "size": 11},
+        gridcolor="#dfe4ec",
+        zeroline=False,
+    )
+    fig.update_yaxes(title="", tickfont={"color": "#475569", "size": 11})
+    return fig
+
+
 def architecture_label(row: pd.Series) -> str:
     if row["family"] == "M-AxPPA":
         return (
@@ -495,6 +629,7 @@ if not DATASET_PATH.exists():
 
 df = load_data()
 hybrid_variants_df = load_hybrid_variants()
+maxppa_complete_df = load_maxppa_complete_results()
 all_variants = sorted(df["variant"].unique())
 
 st.markdown(
@@ -638,13 +773,19 @@ with content_col:
                 )
 
 if not filtered.empty:
-    if hybrid_variants_df.empty:
-        ranking_tab, pareto_tab, data_tab = st.tabs(["Rankings", "Pareto", "Data"])
-        hybrid_tab = None
-    else:
-        ranking_tab, pareto_tab, hybrid_tab, data_tab = st.tabs(
-            ["Rankings", "Pareto", "M-AxPPA MATLAB Hybrids", "Data"]
-        )
+    tab_names = ["Rankings", "Pareto"]
+    if not maxppa_complete_df.empty:
+        tab_names.append("Complete M-AxPPA Results")
+    if not hybrid_variants_df.empty:
+        tab_names.append("M-AxPPA MATLAB Hybrids")
+    tab_names.append("Data")
+
+    tabs = dict(zip(tab_names, st.tabs(tab_names)))
+    ranking_tab = tabs["Rankings"]
+    pareto_tab = tabs["Pareto"]
+    maxppa_complete_tab = tabs.get("Complete M-AxPPA Results")
+    hybrid_tab = tabs.get("M-AxPPA MATLAB Hybrids")
+    data_tab = tabs["Data"]
 
     with ranking_tab:
         ranking_metric = st.radio(
@@ -707,6 +848,204 @@ if not filtered.empty:
             name="Pareto candidate",
         )
         st.plotly_chart(fig_pareto, use_container_width=True)
+
+    if maxppa_complete_tab is not None:
+        with maxppa_complete_tab:
+            incomplete_variants = (
+                maxppa_complete_df[maxppa_complete_df["complete_variant"] == 0]
+                .groupby("variant")[["observed_configurations", "expected_configurations"]]
+                .first()
+                .reset_index()
+            )
+            st.info(
+                "This tab uses the complete M-AxPPA extraction table: exact MSBs (M), "
+                "AxPPA intermediate bits (L), approximated LSBs (K), plus synthesis metrics "
+                "for area, power, timing, energy, PDP and composite PPA gain."
+            )
+            if not incomplete_variants.empty:
+                details = ", ".join(
+                    f"{row.variant}: {int(row.observed_configurations)}/"
+                    f"{int(row.expected_configurations)}"
+                    for row in incomplete_variants.itertuples(index=False)
+                )
+                st.warning(
+                    "Incomplete variants are kept in the CSV for audit but excluded from "
+                    f"the charts by default. Current incomplete set: {details}."
+                )
+
+            show_incomplete = st.checkbox(
+                "Show incomplete variants kept for audit",
+                value=False,
+                help="HEAA is currently incomplete because 11 configurations were not synthesized; it is hidden by default.",
+            )
+            maxppa_base = maxppa_complete_df.copy()
+            if not show_incomplete:
+                maxppa_base = maxppa_base[
+                    maxppa_base["included_in_dashboard"] == 1
+                ].copy()
+
+            maxppa_available = [
+                variant
+                for variant in MAXPPA_VARIANT_ORDER
+                if variant in set(maxppa_base["variant"])
+            ]
+            selected_maxppa_variants = st.multiselect(
+                "Complete M-AxPPA variants",
+                options=maxppa_available,
+                default=maxppa_available,
+            )
+            if not selected_maxppa_variants:
+                selected_maxppa_variants = maxppa_available
+
+            maxppa_view = maxppa_base[
+                maxppa_base["variant"].isin(selected_maxppa_variants)
+            ].copy()
+            maxppa_view["variant"] = pd.Categorical(
+                maxppa_view["variant"],
+                categories=MAXPPA_VARIANT_ORDER,
+                ordered=True,
+            )
+
+            if maxppa_view.empty:
+                st.warning("No complete M-AxPPA rows are available for the current filter.")
+            else:
+                metric_cols = st.columns(4, gap="large")
+                with metric_cols[0]:
+                    render_metric_card(
+                        "Architectures",
+                        f"{len(maxppa_view):,}".replace(",", "."),
+                        "Rows shown after current filters",
+                    )
+                with metric_cols[1]:
+                    render_metric_card(
+                        "Variants",
+                        str(maxppa_view["variant"].nunique()),
+                        "Complete variants by default",
+                    )
+                with metric_cols[2]:
+                    render_metric_card(
+                        "Best PPA Gain",
+                        f"{maxppa_view['ppa_gain_pct'].max():.2f}%",
+                        "Composite gain versus precise baseline",
+                    )
+                with metric_cols[3]:
+                    render_metric_card(
+                        "Lowest MRED",
+                        f"{maxppa_view['mred'].min():.6f}",
+                        "Best observed error in filtered data",
+                    )
+
+                power_col, area_col = st.columns(2, gap="large")
+                with power_col:
+                    with st.container(border=True):
+                        st.markdown(
+                            """
+                            <p class="chart-title">Power Savings vs Error</p>
+                            <p class="chart-subtitle">Extracted from synthesis reports; X axis is MRED.</p>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+                        st.plotly_chart(
+                            build_maxppa_complete_scatter(
+                                maxppa_view,
+                                "total_power_reduction_pct",
+                                "Total power reduction (%)",
+                                selected_maxppa_variants,
+                            ),
+                            use_container_width=True,
+                        )
+
+                with area_col:
+                    with st.container(border=True):
+                        st.markdown(
+                            """
+                            <p class="chart-title">Area Savings vs Error</p>
+                            <p class="chart-subtitle">Total area reduction versus the precise baseline.</p>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+                        st.plotly_chart(
+                            build_maxppa_complete_scatter(
+                                maxppa_view,
+                                "total_area_reduction_pct",
+                                "Total area reduction (%)",
+                                selected_maxppa_variants,
+                            ),
+                            use_container_width=True,
+                        )
+
+                delay_col, rank_col = st.columns(2, gap="large")
+                with delay_col:
+                    with st.container(border=True):
+                        st.markdown(
+                            """
+                            <p class="chart-title">Delay vs Error</p>
+                            <p class="chart-subtitle">Critical delay in ns extracted from timing reports.</p>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+                        st.plotly_chart(
+                            build_maxppa_complete_scatter(
+                                maxppa_view,
+                                "critical_delay_ns",
+                                "Critical delay (ns)",
+                                selected_maxppa_variants,
+                            ),
+                            use_container_width=True,
+                        )
+
+                with rank_col:
+                    with st.container(border=True):
+                        ranking_metric_complete = st.selectbox(
+                            "Ranking metric",
+                            [
+                                "ppa_gain_pct",
+                                "total_power_reduction_pct",
+                                "total_area_reduction_pct",
+                                "energy_reduction_pct",
+                                "pdp_reduction_pct",
+                            ],
+                        )
+                        ranking_labels = {
+                            "ppa_gain_pct": "Composite PPA gain (%)",
+                            "total_power_reduction_pct": "Total power reduction (%)",
+                            "total_area_reduction_pct": "Total area reduction (%)",
+                            "energy_reduction_pct": "Energy reduction (%)",
+                            "pdp_reduction_pct": "PDP reduction (%)",
+                        }
+                        st.plotly_chart(
+                            build_maxppa_rank_bar(
+                                maxppa_view,
+                                ranking_metric_complete,
+                                ranking_labels[ranking_metric_complete],
+                            ),
+                            use_container_width=True,
+                        )
+
+                table_columns = [
+                    "architecture",
+                    "variant",
+                    "config_index",
+                    "m_bits",
+                    "l_bits",
+                    "k_bits",
+                    "mred",
+                    "exact_accuracy_pct",
+                    "total_power_reduction_pct",
+                    "total_area_reduction_pct",
+                    "critical_delay_ns",
+                    "energy_per_operation_fJ",
+                    "pdp_fJ",
+                    "ppa_gain_pct",
+                    "included_in_dashboard",
+                ]
+                st.dataframe(
+                    maxppa_view[table_columns].sort_values(
+                        "ppa_gain_pct", ascending=False
+                    ),
+                    use_container_width=True,
+                    hide_index=True,
+                )
 
     if hybrid_tab is not None:
         with hybrid_tab:

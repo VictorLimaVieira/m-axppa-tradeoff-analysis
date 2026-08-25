@@ -63,6 +63,14 @@ bits, AxPPA intermediate bits, and a selected approximate least-significant-bit
 strategy. Extra experimental LSB strategies are shown alongside the base
 `COPY`, `TRUNC`, and `LOA` options.
 
+The dashboard also includes a complete extracted M-AxPPA results tab based on
+the synthesis/report pipeline. The current extracted set contains 1,564
+approximate architectures. `HEAA` is retained for audit but excluded from the
+complete-results charts by default because only 94 of its 105 configurations
+are present.
+
+Pipeline details: [`docs/maxppa_complete_results_pipeline.md`](docs/maxppa_complete_results_pipeline.md)
+
 ## Confidentiality Note
 
 Current unpublished research involving DCT is intentionally excluded from this repository. This project only uses public paper information and clearly labeled synthetic data.
@@ -163,6 +171,20 @@ This creates:
 - `data/synthetic/synthesis_metrics.csv`
 - `data/processed/tradeoff_dataset.csv`
 - `database/m_axppa_synthetic.sqlite`
+
+## How To Prepare Complete M-AxPPA Results
+
+After receiving or regenerating `resultados_completos.csv`, run:
+
+```bash
+python scripts/prepare_maxppa_complete_results.py
+```
+
+This creates:
+
+- `data/processed/maxppa_complete_results.csv`
+- `data/processed/maxppa_complete_summary.csv`
+- `data/processed/maxppa_missing_configurations.csv`
 
 ## How To Prepare The Power BI Dataset
 
