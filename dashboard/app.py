@@ -288,6 +288,26 @@ st.markdown(
         text-align: center;
     }
 
+    .audit-warning {
+        background: #fff7cc;
+        border: 1px solid #d97706;
+        border-radius: 8px;
+        color: #713f12;
+        font-size: 0.95rem;
+        line-height: 1.45;
+        margin: 0.9rem 0 1rem 0;
+        padding: 0.85rem 1rem;
+    }
+
+    .audit-warning strong {
+        color: #713f12;
+    }
+
+    [data-testid="stAlert"],
+    [data-testid="stAlert"] * {
+        color: #111827 !important;
+    }
+
     div[data-testid="stPlotlyChart"] {
         background: #ffffff;
     }
@@ -299,6 +319,12 @@ st.markdown(
     }
 
     [data-testid="stCheckbox"] label p {
+        color: #334155 !important;
+        font-size: 0.88rem !important;
+    }
+
+    [data-testid="stMultiSelect"] label,
+    [data-testid="stMultiSelect"] label p {
         color: #334155 !important;
         font-size: 0.88rem !important;
     }
@@ -868,9 +894,13 @@ if not filtered.empty:
                     f"{int(row.expected_configurations)}"
                     for row in incomplete_variants.itertuples(index=False)
                 )
-                st.warning(
-                    "Incomplete variants are kept in the CSV for audit but excluded from "
-                    f"the charts by default. Current incomplete set: {details}."
+                st.markdown(
+                    '<div class="audit-warning">'
+                    "<strong>Incomplete variants:</strong> kept in the CSV for audit, "
+                    "but excluded from the charts by default. "
+                    f"Current incomplete set: {details}."
+                    "</div>",
+                    unsafe_allow_html=True,
                 )
 
             show_incomplete = st.checkbox(
