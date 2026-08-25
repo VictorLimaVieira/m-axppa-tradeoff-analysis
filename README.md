@@ -57,6 +57,12 @@ Synthetic dataset scope:
 - 443 architectures in total;
 - accuracy, error, energy, and area metrics prepared for SQL, Python, Power BI, and Streamlit analysis.
 
+The Streamlit dashboard also includes a MATLAB-exported hybrid comparison tab.
+Those hybrid results follow the M-AxPPA partitioning logic: exact most-significant
+bits, AxPPA intermediate bits, and a selected approximate least-significant-bit
+strategy. Extra experimental LSB strategies are shown alongside the base
+`COPY`, `TRUNC`, and `LOA` options.
+
 ## Confidentiality Note
 
 Current unpublished research involving DCT is intentionally excluded from this repository. This project only uses public paper information and clearly labeled synthetic data.

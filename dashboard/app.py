@@ -643,7 +643,7 @@ if not filtered.empty:
         hybrid_tab = None
     else:
         ranking_tab, pareto_tab, hybrid_tab, data_tab = st.tabs(
-            ["Rankings", "Pareto", "MATLAB Hybrids", "Data"]
+            ["Rankings", "Pareto", "M-AxPPA MATLAB Hybrids", "Data"]
         )
 
     with ranking_tab:
@@ -710,6 +710,10 @@ if not filtered.empty:
 
     if hybrid_tab is not None:
         with hybrid_tab:
+            st.info(
+                "These MATLAB results use the M-AxPPA hybrid structure: exact most-significant bits (M), "
+                "AxPPA in the intermediate bits (L), and the selected approximation in the least-significant bits (K)."
+            )
             hybrid_available = [
                 variant
                 for variant in HYBRID_VARIANT_ORDER
@@ -738,8 +742,8 @@ if not filtered.empty:
                 with st.container(border=True):
                     st.markdown(
                         """
-                        <p class="chart-title">Hybrid Accuracy</p>
-                        <p class="chart-subtitle">MATLAB SSIM exported from main.m.</p>
+                        <p class="chart-title">M-AxPPA Hybrid Accuracy</p>
+                        <p class="chart-subtitle">MATLAB SSIM exported from main.m using exact MSBs, AxPPA intermediate bits and approximated LSBs.</p>
                         """,
                         unsafe_allow_html=True,
                     )
@@ -752,7 +756,7 @@ if not filtered.empty:
                 with st.container(border=True):
                     st.markdown(
                         """
-                        <p class="chart-title">Hybrid Error</p>
+                        <p class="chart-title">M-AxPPA Hybrid Error</p>
                         <p class="chart-subtitle">Error computed as 1 - SSIM.</p>
                         """,
                         unsafe_allow_html=True,
