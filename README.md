@@ -43,11 +43,21 @@ Full page: [`docs/analytical_questions.md`](docs/analytical_questions.md)
 
 ## Project Status
 
-This is a public portfolio V1.
+This is a public portfolio V1 evolved into an extracted M-AxPPA results dashboard.
 
-The current dataset is **synthetic** and was generated from the public structure described in the M-AxPPA paper. It is intended to demonstrate the analytics workflow, not to claim real hardware measurements.
+The Streamlit dashboard now opens with the **complete extracted M-AxPPA synthesis table** as the primary source. The older synthetic dataset is still kept in the app as a legacy/reference tab, but it no longer drives the main charts.
 
-Synthetic dataset scope:
+Current extracted M-AxPPA scope:
+
+- `W = 16` bits;
+- exact most-significant bits (`M`);
+- AxPPA intermediate bits (`L`);
+- approximated least-significant bits (`K`);
+- 1,564 approximate architectures currently extracted;
+- 14 complete variants shown by default, totaling 1,470 architectures;
+- `HEAA` retained for audit but excluded by default because only 94 of 105 configurations are present.
+
+Legacy synthetic dataset scope:
 
 - `W = 16` bits;
 - 3 M-AxPPA variants: `COPY`, `TRUNC`, and `LOA`;
@@ -63,11 +73,8 @@ bits, AxPPA intermediate bits, and a selected approximate least-significant-bit
 strategy. Extra experimental LSB strategies are shown alongside the base
 `COPY`, `TRUNC`, and `LOA` options.
 
-The dashboard also includes a complete extracted M-AxPPA results tab based on
-the synthesis/report pipeline. The current extracted set contains 1,564
-approximate architectures. `HEAA` is retained for audit but excluded from the
-complete-results charts by default because only 94 of its 105 configurations
-are present.
+The dashboard also includes a MATLAB-exported hybrid comparison tab and a
+legacy synthetic-data tab for audit/reference.
 
 Pipeline details: [`docs/maxppa_complete_results_pipeline.md`](docs/maxppa_complete_results_pipeline.md)
 

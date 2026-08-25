@@ -12,6 +12,7 @@ MAXPPA_COMPLETE_RESULTS_PATH = (
     ROOT / "data" / "processed" / "maxppa_complete_results.csv"
 )
 DEFAULT_MAX_MRED = 0.10
+DEFAULT_MAXPPA_MAX_MRED = 0.50
 
 VARIANT_COLORS = {
     "APROX5": "#0F766E",
@@ -371,6 +372,8 @@ st.markdown(
 
 @st.cache_data
 def load_data() -> pd.DataFrame:
+    if not DATASET_PATH.exists():
+        return pd.DataFrame()
     return pd.read_csv(DATASET_PATH)
 
 
@@ -637,6 +640,33 @@ def build_maxppa_rank_bar(data: pd.DataFrame, metric: str, label: str) -> px.bar
     return fig
 
 
+def mark_pareto_candidates(
+    data: pd.DataFrame,
+    saving_metric: str,
+    error_metric: str = "mred",
+) -> pd.Series:
+    if data.empty:
+        return pd.Series(dtype=bool)
+
+    ordered = data.sort_values([error_metric, saving_metric], ascending=[True, False])
+    best_seen = -float("inf")
+    pareto_flags = []
+
+    for value in ordered[saving_metric]:
+        is_candidate = value > best_seen
+        pareto_flags.append(is_candidate)
+        if value > best_seen:
+            best_seen = value
+
+    pareto = pd.Series(False, index=data.index)
+    pareto.loc[ordered.index] = pareto_flags
+    return pareto
+
+
+def format_count(value: int) -> str:
+    return f"{value:,}".replace(",", ".")
+
+
 def architecture_label(row: pd.Series) -> str:
     if row["family"] == "M-AxPPA":
         return (
@@ -646,23 +676,30 @@ def architecture_label(row: pd.Series) -> str:
     return f"{row['variant']} | K={int(row['k_bits'])}"
 
 
-if not DATASET_PATH.exists():
+if not MAXPPA_COMPLETE_RESULTS_PATH.exists():
     st.error(
-        "Dataset not found. Run: python src/data_generation/generate_synthetic_data.py"
+        "Complete M-AxPPA dataset not found. Run: "
+        "python scripts/prepare_maxppa_complete_results.py"
     )
     st.stop()
 
 
-df = load_data()
+legacy_df = load_data()
 hybrid_variants_df = load_hybrid_variants()
 maxppa_complete_df = load_maxppa_complete_results()
-all_variants = sorted(df["variant"].unique())
+
+incomplete_variants = (
+    maxppa_complete_df[maxppa_complete_df["complete_variant"] == 0]
+    .groupby("variant")[["observed_configurations", "expected_configurations"]]
+    .first()
+    .reset_index()
+)
 
 st.markdown(
     """
     <div class="hero">
-      <h1>Approximate Computing Trade-off Explorer</h1>
-      <p>Synthetic M-AxPPA dataset | Error, energy and area analysis</p>
+      <h1>M-AxPPA Complete Trade-off Explorer</h1>
+      <p>Extracted synthesis results | Exact MSBs (M), AxPPA intermediate bits (L), approximated LSBs (K)</p>
     </div>
     """,
     unsafe_allow_html=True,
@@ -672,7 +709,7 @@ st.markdown(
     """
     <p class="insight-line">
     Each point represents one architecture. The best region is upper-left:
-    lower error and higher savings.
+    lower error and higher reduction versus the precise baseline.
     </p>
     """,
     unsafe_allow_html=True,
@@ -682,13 +719,60 @@ variant_col, content_col = st.columns([0.72, 3.35], gap="large")
 
 with variant_col:
     with st.container(border=True):
-        st.markdown('<p class="filter-title">Variant</p>', unsafe_allow_html=True)
+        st.markdown('<p class="filter-title">M-AxPPA variants</p>', unsafe_allow_html=True)
         st.markdown(
-            '<p class="filter-note">Select the architecture variants shown in the charts.</p>',
+            '<p class="filter-note">Main charts use the complete extracted synthesis table.</p>',
             unsafe_allow_html=True,
         )
-        selected_variants = []
-        for variant in all_variants:
+
+        if not incomplete_variants.empty:
+            details = ", ".join(
+                f"{row.variant}: {int(row.observed_configurations)}/"
+                f"{int(row.expected_configurations)}"
+                for row in incomplete_variants.itertuples(index=False)
+            )
+            st.markdown(
+                '<div class="audit-warning">'
+                "<strong>Audit note:</strong> incomplete variants stay out of the "
+                f"main view by default. Current incomplete set: {details}."
+                "</div>",
+                unsafe_allow_html=True,
+            )
+
+        show_incomplete = st.checkbox(
+            "Include incomplete variants",
+            value=False,
+            help=(
+                "HEAA is currently incomplete because 11 configurations were not "
+                "synthesized; keep it off for complete-only comparisons."
+            ),
+        )
+
+        maxppa_base = maxppa_complete_df.copy()
+        if not show_incomplete:
+            maxppa_base = maxppa_base[
+                maxppa_base["included_in_dashboard"] == 1
+            ].copy()
+
+        max_mred = st.slider(
+            "Maximum MRED",
+            min_value=0.00,
+            max_value=DEFAULT_MAXPPA_MAX_MRED,
+            value=DEFAULT_MAXPPA_MAX_MRED,
+            step=0.01,
+            format="%.2f",
+            help="Lower this limit when you want stricter error tolerance.",
+        )
+
+        st.markdown('<div class="filter-divider"></div>', unsafe_allow_html=True)
+
+        maxppa_available = [
+            variant
+            for variant in MAXPPA_VARIANT_ORDER
+            if variant in set(maxppa_base["variant"])
+        ]
+        selected_maxppa_variants = []
+        for variant in maxppa_available:
             dot_col, check_col = st.columns([0.14, 0.86], gap="small")
             with dot_col:
                 st.markdown(
@@ -700,382 +784,290 @@ with variant_col:
                     unsafe_allow_html=True,
                 )
             with check_col:
-                if st.checkbox(variant, value=True, key=f"variant_{variant}"):
-                    selected_variants.append(variant)
-        st.markdown('<div class="filter-divider"></div>', unsafe_allow_html=True)
-        max_mred = st.slider(
-            "Maximum MRED",
-            min_value=0.00,
-            max_value=0.30,
-            value=DEFAULT_MAX_MRED,
-            step=0.01,
-            format="%.2f",
-            help="Use a lower limit for stricter error tolerance.",
-        )
+                if st.checkbox(
+                    variant,
+                    value=True,
+                    key=f"maxppa_variant_{variant}",
+                ):
+                    selected_maxppa_variants.append(variant)
 
-if not selected_variants:
-    selected_variants = all_variants
+if not selected_maxppa_variants:
+    selected_maxppa_variants = maxppa_available
 
-filtered = df[
-    df["variant"].isin(selected_variants)
-    & (df["mred"] <= max_mred)
+maxppa_view = maxppa_base[
+    maxppa_base["variant"].isin(selected_maxppa_variants)
+    & (maxppa_base["mred"] <= max_mred)
 ].copy()
+maxppa_view["variant"] = pd.Categorical(
+    maxppa_view["variant"],
+    categories=MAXPPA_VARIANT_ORDER,
+    ordered=True,
+)
 
 with content_col:
-    metric_col_1, metric_col_2, metric_col_3 = st.columns(3, gap="large")
+    metric_col_1, metric_col_2, metric_col_3, metric_col_4 = st.columns(4, gap="large")
     with metric_col_1:
-        if filtered.empty:
+        if maxppa_view.empty:
             render_metric_card("Displayed Architectures", "0", "No rows match filters")
         else:
             render_metric_card(
                 "Displayed Architectures",
-                f"{len(filtered):,.0f}",
-                "Architectures after current filters",
+                format_count(len(maxppa_view)),
+                "M-AxPPA rows after filters",
             )
 
     with metric_col_2:
-        if filtered.empty:
-            render_metric_card("Maximum Energy Savings", "-", "Adjust filters")
+        if maxppa_view.empty:
+            render_metric_card("Variants", "-", "Adjust filters")
         else:
             render_metric_card(
-                "Maximum Energy Savings",
-                f"{filtered['energy_saving_pct'].max():.2f}%",
-                f"Within MRED <= {max_mred:.2f}",
+                "Variants",
+                str(maxppa_view["variant"].nunique()),
+                "Complete variants by default",
             )
 
     with metric_col_3:
-        if filtered.empty:
-            render_metric_card("Maximum Area Savings", "-", "Adjust filters")
+        if maxppa_view.empty:
+            render_metric_card("Best PPA Gain", "-", "Adjust filters")
         else:
             render_metric_card(
-                "Maximum Area Savings",
-                f"{filtered['area_saving_pct'].max():.2f}%",
+                "Best PPA Gain",
+                f"{maxppa_view['ppa_gain_pct'].max():.2f}%",
                 f"Within MRED <= {max_mred:.2f}",
             )
 
-    if filtered.empty:
+    with metric_col_4:
+        if maxppa_view.empty:
+            render_metric_card("Lowest MRED", "-", "Adjust filters")
+        else:
+            render_metric_card(
+                "Lowest MRED",
+                f"{maxppa_view['mred'].min():.6f}",
+                "Best observed error shown",
+            )
+
+    if maxppa_view.empty:
         st.warning("No architectures match the selected filters.")
     else:
-        energy_col, area_col = st.columns(2, gap="large")
+        power_col, area_col = st.columns(2, gap="large")
 
-        with energy_col:
+        with power_col:
             with st.container(border=True):
                 st.markdown(
                     """
-                    <p class="chart-title">Energy Savings (%) vs Error (MRED)</p>
-                    <p class="chart-subtitle">Energy view: controlled error with higher power reduction.</p>
+                    <p class="chart-title">Power Reduction (%) vs Error (MRED)</p>
+                    <p class="chart-subtitle">Updated main view from extracted M-AxPPA synthesis reports.</p>
                     """,
                     unsafe_allow_html=True,
                 )
                 st.plotly_chart(
-                    build_scatter(
-                        filtered,
-                        "energy_saving_pct",
-                        "Energy savings (%)",
-                        selected_variants,
-                        max_mred,
+                    build_maxppa_complete_scatter(
+                        maxppa_view,
+                        "total_power_reduction_pct",
+                        "Total power reduction (%)",
+                        selected_maxppa_variants,
                     ),
-                    use_container_width=True,
                 )
 
         with area_col:
             with st.container(border=True):
                 st.markdown(
                     """
-                    <p class="chart-title">Area Savings (%) vs Error (MRED)</p>
-                    <p class="chart-subtitle">Area view: controlled error with smaller circuit footprint.</p>
+                    <p class="chart-title">Area Reduction (%) vs Error (MRED)</p>
+                    <p class="chart-subtitle">Updated main view from total area reduction versus the precise baseline.</p>
                     """,
                     unsafe_allow_html=True,
                 )
                 st.plotly_chart(
-                    build_scatter(
-                        filtered,
-                        "area_saving_pct",
-                        "Area savings (%)",
-                        selected_variants,
-                        max_mred,
+                    build_maxppa_complete_scatter(
+                        maxppa_view,
+                        "total_area_reduction_pct",
+                        "Total area reduction (%)",
+                        selected_maxppa_variants,
                     ),
-                    use_container_width=True,
                 )
 
-if not filtered.empty:
-    tab_names = ["Rankings", "Pareto"]
-    if not maxppa_complete_df.empty:
-        tab_names.append("Complete M-AxPPA Results")
+if not maxppa_view.empty:
+    tab_names = ["Rankings", "Pareto", "Synthesis Details"]
     if not hybrid_variants_df.empty:
-        tab_names.append("M-AxPPA MATLAB Hybrids")
-    tab_names.append("Data")
+        tab_names.append("MATLAB Hybrid Accuracy")
+    if not legacy_df.empty:
+        tab_names.append("Legacy Synthetic Data")
 
     tabs = dict(zip(tab_names, st.tabs(tab_names)))
     ranking_tab = tabs["Rankings"]
     pareto_tab = tabs["Pareto"]
-    maxppa_complete_tab = tabs.get("Complete M-AxPPA Results")
-    hybrid_tab = tabs.get("M-AxPPA MATLAB Hybrids")
-    data_tab = tabs["Data"]
+    synthesis_tab = tabs["Synthesis Details"]
+    hybrid_tab = tabs.get("MATLAB Hybrid Accuracy")
+    legacy_tab = tabs.get("Legacy Synthetic Data")
 
     with ranking_tab:
-        ranking_metric = st.radio(
+        ranking_metric_complete = st.radio(
             "Ranking criterion",
-            ["balanced_score", "energy_saving_pct", "area_saving_pct", "mred"],
+            [
+                "ppa_gain_pct",
+                "total_power_reduction_pct",
+                "total_area_reduction_pct",
+                "energy_reduction_pct",
+                "pdp_reduction_pct",
+            ],
             horizontal=True,
         )
-        ascending = ranking_metric == "mred"
-        top = filtered.sort_values(ranking_metric, ascending=ascending).head(15).copy()
-        top["label"] = top.apply(architecture_label, axis=1)
-
-        fig_rank = px.bar(
-            top,
-            x=ranking_metric,
-            y="label",
-            color="variant",
-            color_discrete_map=VARIANT_COLORS,
-            category_orders={"variant": selected_variants},
-            orientation="h",
-            title=f"Top architectures by {ranking_metric}",
+        ranking_labels = {
+            "ppa_gain_pct": "Composite PPA gain (%)",
+            "total_power_reduction_pct": "Total power reduction (%)",
+            "total_area_reduction_pct": "Total area reduction (%)",
+            "energy_reduction_pct": "Energy reduction (%)",
+            "pdp_reduction_pct": "PDP reduction (%)",
+        }
+        st.plotly_chart(
+            build_maxppa_rank_bar(
+                maxppa_view,
+                ranking_metric_complete,
+                ranking_labels[ranking_metric_complete],
+            ),
         )
-        fig_rank.update_layout(
-            height=540,
-            paper_bgcolor="#ffffff",
-            plot_bgcolor="#ffffff",
-            margin=dict(l=10, r=10, t=52, b=10),
-            legend={
-                "title": {"font": {"color": "#111827", "size": 12}},
-                "font": {"color": "#111827", "size": 11},
-            },
-            yaxis={"categoryorder": "total ascending"},
-            font=dict(color="#1f2937", family="Segoe UI"),
-        )
-        fig_rank.update_xaxes(
-            gridcolor="#dfe4ec",
-            title_font={"color": "#111827", "size": 12},
-            tickfont={"color": "#111827", "size": 11},
-        )
-        fig_rank.update_yaxes(title="", tickfont={"color": "#111827", "size": 11})
-        st.plotly_chart(fig_rank, use_container_width=True)
 
     with pareto_tab:
-        pareto = filtered[
-            (filtered["pareto_optimal_energy_error"] == 1)
-            | (filtered["pareto_optimal_area_error"] == 1)
-        ]
-        fig_pareto = build_scatter(
-            filtered,
-            "energy_saving_pct",
-            "Energy savings (%)",
-            selected_variants,
-            max_mred,
-        )
-        fig_pareto.update_traces(opacity=0.35)
-        fig_pareto.add_scatter(
-            x=pareto["mred"],
-            y=pareto["energy_saving_pct"],
-            mode="markers",
-            marker={"size": 11, "symbol": "diamond", "color": "#111827"},
-            name="Pareto candidate",
-        )
-        st.plotly_chart(fig_pareto, use_container_width=True)
+        pareto_power = maxppa_view[mark_pareto_candidates(
+            maxppa_view,
+            "total_power_reduction_pct",
+        )]
+        pareto_area = maxppa_view[mark_pareto_candidates(
+            maxppa_view,
+            "total_area_reduction_pct",
+        )]
 
-    if maxppa_complete_tab is not None:
-        with maxppa_complete_tab:
-            incomplete_variants = (
-                maxppa_complete_df[maxppa_complete_df["complete_variant"] == 0]
-                .groupby("variant")[["observed_configurations", "expected_configurations"]]
-                .first()
-                .reset_index()
-            )
-            st.info(
-                "This tab uses the complete M-AxPPA extraction table: exact MSBs (M), "
-                "AxPPA intermediate bits (L), approximated LSBs (K), plus synthesis metrics "
-                "for area, power, timing, energy, PDP and composite PPA gain."
-            )
-            if not incomplete_variants.empty:
-                details = ", ".join(
-                    f"{row.variant}: {int(row.observed_configurations)}/"
-                    f"{int(row.expected_configurations)}"
-                    for row in incomplete_variants.itertuples(index=False)
-                )
+        pareto_power_col, pareto_area_col = st.columns(2, gap="large")
+        with pareto_power_col:
+            with st.container(border=True):
                 st.markdown(
-                    '<div class="audit-warning">'
-                    "<strong>Incomplete variants:</strong> kept in the CSV for audit, "
-                    "but excluded from the charts by default. "
-                    f"Current incomplete set: {details}."
-                    "</div>",
+                    """
+                    <p class="chart-title">Power Pareto Candidates</p>
+                    <p class="chart-subtitle">Diamonds mark architectures not dominated by lower error and higher power reduction.</p>
+                    """,
                     unsafe_allow_html=True,
                 )
-
-            show_incomplete = st.checkbox(
-                "Show incomplete variants kept for audit",
-                value=False,
-                help="HEAA is currently incomplete because 11 configurations were not synthesized; it is hidden by default.",
-            )
-            maxppa_base = maxppa_complete_df.copy()
-            if not show_incomplete:
-                maxppa_base = maxppa_base[
-                    maxppa_base["included_in_dashboard"] == 1
-                ].copy()
-
-            maxppa_available = [
-                variant
-                for variant in MAXPPA_VARIANT_ORDER
-                if variant in set(maxppa_base["variant"])
-            ]
-            selected_maxppa_variants = st.multiselect(
-                "Complete M-AxPPA variants",
-                options=maxppa_available,
-                default=maxppa_available,
-            )
-            if not selected_maxppa_variants:
-                selected_maxppa_variants = maxppa_available
-
-            maxppa_view = maxppa_base[
-                maxppa_base["variant"].isin(selected_maxppa_variants)
-            ].copy()
-            maxppa_view["variant"] = pd.Categorical(
-                maxppa_view["variant"],
-                categories=MAXPPA_VARIANT_ORDER,
-                ordered=True,
-            )
-
-            if maxppa_view.empty:
-                st.warning("No complete M-AxPPA rows are available for the current filter.")
-            else:
-                metric_cols = st.columns(4, gap="large")
-                with metric_cols[0]:
-                    render_metric_card(
-                        "Architectures",
-                        f"{len(maxppa_view):,}".replace(",", "."),
-                        "Rows shown after current filters",
-                    )
-                with metric_cols[1]:
-                    render_metric_card(
-                        "Variants",
-                        str(maxppa_view["variant"].nunique()),
-                        "Complete variants by default",
-                    )
-                with metric_cols[2]:
-                    render_metric_card(
-                        "Best PPA Gain",
-                        f"{maxppa_view['ppa_gain_pct'].max():.2f}%",
-                        "Composite gain versus precise baseline",
-                    )
-                with metric_cols[3]:
-                    render_metric_card(
-                        "Lowest MRED",
-                        f"{maxppa_view['mred'].min():.6f}",
-                        "Best observed error in filtered data",
-                    )
-
-                power_col, area_col = st.columns(2, gap="large")
-                with power_col:
-                    with st.container(border=True):
-                        st.markdown(
-                            """
-                            <p class="chart-title">Power Savings vs Error</p>
-                            <p class="chart-subtitle">Extracted from synthesis reports; X axis is MRED.</p>
-                            """,
-                            unsafe_allow_html=True,
-                        )
-                        st.plotly_chart(
-                            build_maxppa_complete_scatter(
-                                maxppa_view,
-                                "total_power_reduction_pct",
-                                "Total power reduction (%)",
-                                selected_maxppa_variants,
-                            ),
-                            use_container_width=True,
-                        )
-
-                with area_col:
-                    with st.container(border=True):
-                        st.markdown(
-                            """
-                            <p class="chart-title">Area Savings vs Error</p>
-                            <p class="chart-subtitle">Total area reduction versus the precise baseline.</p>
-                            """,
-                            unsafe_allow_html=True,
-                        )
-                        st.plotly_chart(
-                            build_maxppa_complete_scatter(
-                                maxppa_view,
-                                "total_area_reduction_pct",
-                                "Total area reduction (%)",
-                                selected_maxppa_variants,
-                            ),
-                            use_container_width=True,
-                        )
-
-                delay_col, rank_col = st.columns(2, gap="large")
-                with delay_col:
-                    with st.container(border=True):
-                        st.markdown(
-                            """
-                            <p class="chart-title">Delay vs Error</p>
-                            <p class="chart-subtitle">Critical delay in ns extracted from timing reports.</p>
-                            """,
-                            unsafe_allow_html=True,
-                        )
-                        st.plotly_chart(
-                            build_maxppa_complete_scatter(
-                                maxppa_view,
-                                "critical_delay_ns",
-                                "Critical delay (ns)",
-                                selected_maxppa_variants,
-                            ),
-                            use_container_width=True,
-                        )
-
-                with rank_col:
-                    with st.container(border=True):
-                        ranking_metric_complete = st.selectbox(
-                            "Ranking metric",
-                            [
-                                "ppa_gain_pct",
-                                "total_power_reduction_pct",
-                                "total_area_reduction_pct",
-                                "energy_reduction_pct",
-                                "pdp_reduction_pct",
-                            ],
-                        )
-                        ranking_labels = {
-                            "ppa_gain_pct": "Composite PPA gain (%)",
-                            "total_power_reduction_pct": "Total power reduction (%)",
-                            "total_area_reduction_pct": "Total area reduction (%)",
-                            "energy_reduction_pct": "Energy reduction (%)",
-                            "pdp_reduction_pct": "PDP reduction (%)",
-                        }
-                        st.plotly_chart(
-                            build_maxppa_rank_bar(
-                                maxppa_view,
-                                ranking_metric_complete,
-                                ranking_labels[ranking_metric_complete],
-                            ),
-                            use_container_width=True,
-                        )
-
-                table_columns = [
-                    "architecture",
-                    "variant",
-                    "config_index",
-                    "m_bits",
-                    "l_bits",
-                    "k_bits",
-                    "mred",
-                    "exact_accuracy_pct",
+                fig_pareto_power = build_maxppa_complete_scatter(
+                    maxppa_view,
                     "total_power_reduction_pct",
-                    "total_area_reduction_pct",
-                    "critical_delay_ns",
-                    "energy_per_operation_fJ",
-                    "pdp_fJ",
-                    "ppa_gain_pct",
-                    "included_in_dashboard",
-                ]
-                st.dataframe(
-                    maxppa_view[table_columns].sort_values(
-                        "ppa_gain_pct", ascending=False
-                    ),
-                    use_container_width=True,
-                    hide_index=True,
+                    "Total power reduction (%)",
+                    selected_maxppa_variants,
                 )
+                fig_pareto_power.update_traces(opacity=0.28)
+                fig_pareto_power.add_scatter(
+                    x=pareto_power["mred"],
+                    y=pareto_power["total_power_reduction_pct"],
+                    mode="markers",
+                    marker={"size": 11, "symbol": "diamond", "color": "#111827"},
+                    name="Pareto candidate",
+                )
+                st.plotly_chart(fig_pareto_power)
+
+        with pareto_area_col:
+            with st.container(border=True):
+                st.markdown(
+                    """
+                    <p class="chart-title">Area Pareto Candidates</p>
+                    <p class="chart-subtitle">Diamonds mark architectures not dominated by lower error and higher area reduction.</p>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                fig_pareto_area = build_maxppa_complete_scatter(
+                    maxppa_view,
+                    "total_area_reduction_pct",
+                    "Total area reduction (%)",
+                    selected_maxppa_variants,
+                )
+                fig_pareto_area.update_traces(opacity=0.28)
+                fig_pareto_area.add_scatter(
+                    x=pareto_area["mred"],
+                    y=pareto_area["total_area_reduction_pct"],
+                    mode="markers",
+                    marker={"size": 11, "symbol": "diamond", "color": "#111827"},
+                    name="Pareto candidate",
+                )
+                st.plotly_chart(fig_pareto_area)
+
+    with synthesis_tab:
+        st.info(
+            "This is the canonical table used by the dashboard opening view: "
+            "M exact bits, L AxPPA bits, K approximated bits, plus synthesis "
+            "metrics for area, power, timing, energy, PDP and composite PPA gain."
+        )
+
+        delay_col, summary_col = st.columns(2, gap="large")
+        with delay_col:
+            with st.container(border=True):
+                st.markdown(
+                    """
+                    <p class="chart-title">Critical Delay vs Error</p>
+                    <p class="chart-subtitle">Timing report metric extracted per architecture.</p>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                st.plotly_chart(
+                    build_maxppa_complete_scatter(
+                        maxppa_view,
+                        "critical_delay_ns",
+                        "Critical delay (ns)",
+                        selected_maxppa_variants,
+                    ),
+                )
+
+        with summary_col:
+            with st.container(border=True):
+                summary = (
+                    maxppa_view.groupby("variant", observed=True)
+                    .agg(
+                        architectures=("architecture", "count"),
+                        min_mred=("mred", "min"),
+                        max_power_reduction_pct=(
+                            "total_power_reduction_pct",
+                            "max",
+                        ),
+                        max_area_reduction_pct=(
+                            "total_area_reduction_pct",
+                            "max",
+                        ),
+                        max_ppa_gain_pct=("ppa_gain_pct", "max"),
+                    )
+                    .reset_index()
+                    .sort_values("max_ppa_gain_pct", ascending=False)
+                )
+                st.markdown(
+                    """
+                    <p class="chart-title">Variant Summary</p>
+                    <p class="chart-subtitle">Aggregated over the current filters.</p>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                st.dataframe(summary, width="stretch", hide_index=True)
+
+        table_columns = [
+            "architecture",
+            "variant",
+            "config_index",
+            "m_bits",
+            "l_bits",
+            "k_bits",
+            "mred",
+            "exact_accuracy_pct",
+            "total_power_reduction_pct",
+            "total_area_reduction_pct",
+            "critical_delay_ns",
+            "energy_per_operation_fJ",
+            "pdp_fJ",
+            "ppa_gain_pct",
+            "included_in_dashboard",
+        ]
+        st.dataframe(
+            maxppa_view[table_columns].sort_values(
+                "ppa_gain_pct", ascending=False
+            ),
+            width="stretch",
+            hide_index=True,
+        )
 
     if hybrid_tab is not None:
         with hybrid_tab:
@@ -1118,7 +1110,6 @@ if not filtered.empty:
                     )
                     st.plotly_chart(
                         build_hybrid_variant_line(hybrid_view, "ssim", "SSIM"),
-                        use_container_width=True,
                     )
 
             with error_col:
@@ -1132,43 +1123,97 @@ if not filtered.empty:
                     )
                     st.plotly_chart(
                         build_hybrid_variant_line(hybrid_view, "ssim_error", "1 - SSIM"),
-                        use_container_width=True,
                     )
 
             st.dataframe(
                 hybrid_view.sort_values(["config_index", "variant"]),
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
-    with data_tab:
-        columns = [
-            "family",
-            "variant",
-            "m_bits",
-            "l_bits",
-            "k_bits",
-            "ssim",
-            "ncc",
-            "mae",
-            "mre",
-            "mred",
-            "energy_saving_pct",
-            "area_saving_pct",
-            "balanced_score",
-            "selected_for_synthesis",
-        ]
-        st.dataframe(
-            filtered[columns].sort_values("balanced_score", ascending=False),
-            use_container_width=True,
-            hide_index=True,
-        )
+    if legacy_tab is not None:
+        with legacy_tab:
+            st.info(
+                "Legacy reference only: this synthetic dataset was the original "
+                "portfolio/demo view. It is no longer the source for the main "
+                "opening charts."
+            )
+            legacy_variants = sorted(legacy_df["variant"].unique())
+            selected_legacy_variants = st.multiselect(
+                "Legacy variants",
+                options=legacy_variants,
+                default=legacy_variants,
+            )
+            if not selected_legacy_variants:
+                selected_legacy_variants = legacy_variants
+
+            legacy_max_mred = st.slider(
+                "Legacy maximum MRED",
+                min_value=0.00,
+                max_value=0.30,
+                value=DEFAULT_MAX_MRED,
+                step=0.01,
+                format="%.2f",
+            )
+            legacy_filtered = legacy_df[
+                legacy_df["variant"].isin(selected_legacy_variants)
+                & (legacy_df["mred"] <= legacy_max_mred)
+            ].copy()
+
+            if legacy_filtered.empty:
+                st.warning("No legacy architectures match the selected filters.")
+            else:
+                legacy_energy_col, legacy_area_col = st.columns(2, gap="large")
+                with legacy_energy_col:
+                    st.plotly_chart(
+                        build_scatter(
+                            legacy_filtered,
+                            "energy_saving_pct",
+                            "Energy savings (%)",
+                            selected_legacy_variants,
+                            legacy_max_mred,
+                        ),
+                    )
+                with legacy_area_col:
+                    st.plotly_chart(
+                        build_scatter(
+                            legacy_filtered,
+                            "area_saving_pct",
+                            "Area savings (%)",
+                            selected_legacy_variants,
+                            legacy_max_mred,
+                        ),
+                    )
+                columns = [
+                    "family",
+                    "variant",
+                    "m_bits",
+                    "l_bits",
+                    "k_bits",
+                    "ssim",
+                    "ncc",
+                    "mae",
+                    "mre",
+                    "mred",
+                    "energy_saving_pct",
+                    "area_saving_pct",
+                    "balanced_score",
+                    "selected_for_synthesis",
+                ]
+                st.dataframe(
+                    legacy_filtered[columns].sort_values(
+                        "balanced_score",
+                        ascending=False,
+                    ),
+                    width="stretch",
+                    hide_index=True,
+                )
 
 st.markdown(
     """
     <div class="footer-note">
-    Synthetic data based on the public M-AxPPA paper structure. Values demonstrate
-    the analysis workflow and do not represent real hardware measurements.
+    Main dashboard view uses the extracted M-AxPPA synthesis results. Legacy
+    synthetic data is kept only as a separate reference/audit tab.
     </div>
     """,
     unsafe_allow_html=True,
