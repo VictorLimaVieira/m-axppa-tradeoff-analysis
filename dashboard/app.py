@@ -414,6 +414,24 @@ st.markdown(
         margin: 0.55rem 0;
     }
 
+    [data-testid="stExpander"] > details > summary {
+        background: #ffffff !important;
+        color: #1f2937 !important;
+        border-radius: 10px 10px 0 0;
+    }
+
+    [data-testid="stExpander"] > details > summary:hover {
+        background: #f8fafc !important;
+    }
+
+    [data-testid="stExpander"] > details > summary * {
+        color: #1f2937 !important;
+    }
+
+    [data-testid="stExpander"] > details > summary svg {
+        fill: #1f2937 !important;
+    }
+
     [data-testid="stExpander"] summary p {
         color: #1f2937 !important;
         font-weight: 700 !important;
@@ -589,9 +607,18 @@ def build_scatter(
 
 
 def build_hybrid_variant_line(data: pd.DataFrame, y: str, y_label: str) -> px.line:
+    plotted = data.copy()
+    plotted["mlk_split_order"] = plotted["config_index"]
+    plotted["bit_split"] = plotted.apply(
+        lambda row: (
+            f"M={int(row['m_bits'])}, L={int(row['l_bits'])}, "
+            f"K={int(row['k_bits'])}"
+        ),
+        axis=1,
+    )
     fig = px.line(
-        data,
-        x="config_index",
+        plotted,
+        x="mlk_split_order",
         y=y,
         color="variant",
         color_discrete_map=VARIANT_COLORS,
@@ -599,9 +626,12 @@ def build_hybrid_variant_line(data: pd.DataFrame, y: str, y_label: str) -> px.li
         log_x=True,
         hover_data={
             "variant": True,
+            "bit_split": True,
             "m_bits": True,
             "l_bits": True,
             "k_bits": True,
+            "config_index": False,
+            "mlk_split_order": False,
             "ssim": ":.6f",
             "ssim_error": ":.6f",
         },
@@ -624,7 +654,7 @@ def build_hybrid_variant_line(data: pd.DataFrame, y: str, y_label: str) -> px.li
         font=dict(color="#1f2937", family="Segoe UI"),
     )
     fig.update_xaxes(
-        title="Configuration index",
+        title="M/L/K split order (hover to see M, L and K)",
         title_font={"color": "#1f2937", "size": 12},
         tickfont={"color": "#475569", "size": 11},
         gridcolor="#dfe4ec",
@@ -815,19 +845,31 @@ def build_lsb_trio_line(
     metric_label: str,
 ) -> px.line:
     ordered = data.sort_values(["config_index", "variant"]).copy()
+    ordered["mlk_split_order"] = ordered["config_index"]
+    ordered["bit_split"] = ordered.apply(
+        lambda row: (
+            f"M={int(row['m_bits'])}, L={int(row['l_bits'])}, "
+            f"K={int(row['k_bits'])}"
+        ),
+        axis=1,
+    )
     fig = px.line(
         ordered,
-        x="config_index",
+        x="mlk_split_order",
         y=metric,
         color="variant",
         markers=True,
         color_discrete_map=VARIANT_COLORS,
         category_orders={"variant": CORE_LSB_VARIANTS},
         hover_data={
+            "architecture": True,
             "variant": True,
+            "bit_split": True,
             "m_bits": True,
             "l_bits": True,
             "k_bits": True,
+            "config_index": False,
+            "mlk_split_order": False,
             "mred": ":.6f",
             "total_power_reduction_pct": ":.2f",
             "total_area_reduction_pct": ":.2f",
@@ -852,7 +894,7 @@ def build_lsb_trio_line(
         font=dict(color="#1f2937", family="Segoe UI"),
     )
     fig.update_xaxes(
-        title="Configuration index",
+        title="M/L/K split order (hover to see the exact architecture)",
         title_font={"color": "#1f2937", "size": 12},
         tickfont={"color": "#475569", "size": 11},
         gridcolor="#dfe4ec",
@@ -869,16 +911,32 @@ def build_lsb_trio_line(
 
 
 def build_lsb_config_bar(data: pd.DataFrame, metric: str, metric_label: str) -> px.bar:
-    ranked = sort_by_metric(data, metric)
+    ranked = data.copy()
+    ranked["variant"] = pd.Categorical(
+        ranked["variant"],
+        categories=CORE_LSB_VARIANTS,
+        ordered=True,
+    )
+    ranked = ranked.sort_values("variant")
+    ranked["value_label"] = ranked[metric].apply(
+        lambda value: "0.00" if abs(float(value)) < 0.005 else f"{float(value):.2f}"
+    )
+    ranked["bar_label"] = ranked.apply(
+        lambda row: "" if abs(float(row[metric])) < 0.005 else row["value_label"],
+        axis=1,
+    )
     fig = px.bar(
         ranked,
         x="variant",
         y=metric,
         color="variant",
+        text="bar_label",
         color_discrete_map=VARIANT_COLORS,
         category_orders={"variant": CORE_LSB_VARIANTS},
         hover_data={
             "architecture": True,
+            "value_label": False,
+            "bar_label": False,
             "m_bits": True,
             "l_bits": True,
             "k_bits": True,
@@ -888,6 +946,30 @@ def build_lsb_config_bar(data: pd.DataFrame, metric: str, metric_label: str) -> 
             "ppa_gain_pct": ":.2f",
         },
     )
+    fig.update_traces(
+        textposition="outside",
+        textfont={"color": "#111827", "size": 11},
+        cliponaxis=False,
+    )
+    for row in ranked.itertuples(index=False):
+        value = float(getattr(row, metric))
+        if abs(value) < 0.005:
+            fig.add_scatter(
+                x=[row.variant],
+                y=[0],
+                mode="markers+text",
+                marker={
+                    "size": 9,
+                    "symbol": "circle-open",
+                    "color": VARIANT_COLORS.get(str(row.variant), "#111827"),
+                    "line": {"width": 2},
+                },
+                text=[row.value_label],
+                textposition="top center",
+                textfont={"color": "#111827", "size": 11},
+                showlegend=False,
+                hoverinfo="skip",
+            )
     fig.update_layout(
         height=360,
         showlegend=False,
@@ -910,6 +992,10 @@ def build_lsb_config_bar(data: pd.DataFrame, metric: str, metric_label: str) -> 
         gridcolor="#dfe4ec",
         zeroline=False,
     )
+    values = ranked[metric].dropna()
+    if not values.empty and float(values.min()) >= 0:
+        top = float(values.max())
+        fig.update_yaxes(range=[0, max(1.0, top * 1.18)])
     return fig
 
 
@@ -1261,8 +1347,11 @@ chart_view["variant"] = pd.Categorical(
 x_metric = "mred"
 x_metric_label = "Error (MRED)"
 
-lsb_trio_view = filtered_by_structure[
-    filtered_by_structure["variant"].isin(CORE_LSB_VARIANTS)
+lsb_trio_view = maxppa_base[
+    maxppa_base["variant"].isin(CORE_LSB_VARIANTS)
+    & maxppa_base["m_bits"].isin(selected_m_values)
+    & maxppa_base["l_bits"].isin(selected_l_values)
+    & maxppa_base["k_bits"].isin(selected_k_values)
 ].copy()
 lsb_trio_view["variant"] = pd.Categorical(
     lsb_trio_view["variant"],
@@ -1398,8 +1487,9 @@ if not maxppa_view.empty:
     with lsb_trio_tab:
         st.info(
             "Direct comparison of the three core M-AxPPA LSB choices: COPY, "
-            "TRUNC and LOA. This tab uses the same M/L/K, MRED and reduction "
-            "filters, but always focuses on the LSB trio."
+            "TRUNC and LOA. This tab keeps the M/L/K bit-split filters, but "
+            "does not apply the MRED or reduction cutoffs; otherwise a weaker "
+            "method could disappear from a side-by-side comparison."
         )
         if lsb_trio_view.empty:
             st.warning("No COPY/TRUNC/LOA rows match the current filters.")
@@ -1416,8 +1506,8 @@ if not maxppa_view.empty:
                 with st.container(border=True):
                     st.markdown(
                         f"""
-                        <p class="chart-title">COPY × TRUNC × LOA across configurations</p>
-                        <p class="chart-subtitle">Same bit-partition filters; changing only the LSB approximator.</p>
+                        <p class="chart-title">COPY × TRUNC × LOA across M/L/K splits</p>
+                        <p class="chart-subtitle">Each point is one concrete architecture. The x-axis is only the ordered list of M/L/K splits; hover shows the architecture name.</p>
                         """,
                         unsafe_allow_html=True,
                     )
@@ -1435,15 +1525,20 @@ if not maxppa_view.empty:
                 .sort_values(["m_bits", "l_bits", "k_bits"])
             )
             config_labels = {
-                f"M={int(row.m_bits)}, L={int(row.l_bits)}, K={int(row.k_bits)}"
-                f" | config {int(row.config_index)}": int(row.config_index)
+                f"M={int(row.m_bits)}, L={int(row.l_bits)}, K={int(row.k_bits)}": int(
+                    row.config_index
+                )
                 for row in config_table.itertuples(index=False)
             }
             default_config_label = next(iter(config_labels))
             selected_config_label = st.selectbox(
-                "Choose one M/L/K split for side-by-side bars",
+                "Choose one bit split (M/L/K) for side-by-side bars",
                 options=list(config_labels.keys()),
                 index=list(config_labels.keys()).index(default_config_label),
+                help=(
+                    "The same M, L and K are applied to COPY, TRUNC and LOA. "
+                    "Only the least-significant K-region approximator changes."
+                ),
             )
             selected_config = config_labels[selected_config_label]
             selected_config_rows = lsb_trio_view[
@@ -1454,8 +1549,8 @@ if not maxppa_view.empty:
                 with st.container(border=True):
                     st.markdown(
                         f"""
-                        <p class="chart-title">Selected split: {selected_config_label}</p>
-                        <p class="chart-subtitle">Side-by-side result for COPY, TRUNC and LOA.</p>
+                        <p class="chart-title">Selected bit split: {selected_config_label}</p>
+                        <p class="chart-subtitle">Same exact M region and AxPPA L region; only the K-region method changes.</p>
                         """,
                         unsafe_allow_html=True,
                     )
@@ -1467,22 +1562,47 @@ if not maxppa_view.empty:
                         )
                     )
 
+            lsb_table = lsb_trio_view[
+                [
+                    "architecture",
+                    "variant",
+                    "config_index",
+                    "m_bits",
+                    "l_bits",
+                    "k_bits",
+                    "mred",
+                    "exact_accuracy_pct",
+                    "total_power_reduction_pct",
+                    "total_area_reduction_pct",
+                    "critical_delay_ns",
+                    "ppa_gain_pct",
+                ]
+            ].sort_values(["config_index", "variant"])
+            lsb_table = lsb_table.rename(
+                columns={
+                    "config_index": "bit_split_order",
+                    "m_bits": "M_exact_bits",
+                    "l_bits": "L_AxPPA_bits",
+                    "k_bits": "K_LSB_bits",
+                }
+            )
             st.dataframe(
-                lsb_trio_view[
+                lsb_table[
                     [
                         "architecture",
                         "variant",
-                        "config_index",
-                        "m_bits",
-                        "l_bits",
-                        "k_bits",
+                        "bit_split_order",
+                        "M_exact_bits",
+                        "L_AxPPA_bits",
+                        "K_LSB_bits",
                         "mred",
+                        "exact_accuracy_pct",
                         "total_power_reduction_pct",
                         "total_area_reduction_pct",
                         "critical_delay_ns",
                         "ppa_gain_pct",
                     ]
-                ].sort_values(["config_index", "variant"]),
+                ],
                 width="stretch",
                 hide_index=True,
             )
