@@ -76,6 +76,15 @@ strategy. Extra experimental LSB strategies are shown alongside the base
 The dashboard also includes a MATLAB-exported hybrid comparison tab and a
 legacy synthetic-data tab for audit/reference.
 
+Streamlit exploration controls:
+
+- LSB approximation group filter for `COPY`, `TRUNC`, `LOA` versus experimental approximators;
+- variant presets for clean trio comparison, all selected groups, experimental-only, or custom selection;
+- advanced `M`, `L`, and `K` bit-partition filters;
+- reduction filters for power, area, and composite PPA gain;
+- graph-density modes: best per variant, top N, Pareto-only, or all filtered architectures;
+- a dedicated `LSB Trio Compare` tab to compare `COPY`, `TRUNC`, and `LOA` under the same `(M, L, K)` split.
+
 Pipeline details: [`docs/maxppa_complete_results_pipeline.md`](docs/maxppa_complete_results_pipeline.md)
 
 ## Confidentiality Note

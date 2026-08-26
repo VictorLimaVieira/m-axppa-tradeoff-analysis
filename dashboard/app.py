@@ -13,6 +13,7 @@ MAXPPA_COMPLETE_RESULTS_PATH = (
 )
 DEFAULT_MAX_MRED = 0.10
 DEFAULT_MAXPPA_MAX_MRED = 0.50
+CORE_LSB_VARIANTS = ["COPY", "TRUNC", "LOA"]
 
 VARIANT_COLORS = {
     "APROX5": "#0F766E",
@@ -83,6 +84,30 @@ MAXPPA_VARIANT_ORDER = [
     "TRUNC",
     "HEAA",
 ]
+
+MAXPPA_METRICS = {
+    "PPA gain (%)": "ppa_gain_pct",
+    "Power reduction (%)": "total_power_reduction_pct",
+    "Area reduction (%)": "total_area_reduction_pct",
+    "Energy reduction (%)": "energy_reduction_pct",
+    "PDP reduction (%)": "pdp_reduction_pct",
+    "Critical delay (ns)": "critical_delay_ns",
+    "Exact accuracy (%)": "exact_accuracy_pct",
+    "Error (MRED)": "mred",
+}
+
+MAXPPA_METRIC_LABELS = {
+    "ppa_gain_pct": "Composite PPA gain (%)",
+    "total_power_reduction_pct": "Total power reduction (%)",
+    "total_area_reduction_pct": "Total area reduction (%)",
+    "energy_reduction_pct": "Energy reduction (%)",
+    "pdp_reduction_pct": "PDP reduction (%)",
+    "critical_delay_ns": "Critical delay (ns)",
+    "exact_accuracy_pct": "Exact accuracy (%)",
+    "mred": "Error (MRED)",
+}
+
+LOWER_IS_BETTER_METRICS = {"mred", "critical_delay_ns", "energy_per_operation_fJ", "pdp_fJ"}
 
 
 st.set_page_config(
@@ -388,9 +413,20 @@ def load_hybrid_variants() -> pd.DataFrame:
 def load_maxppa_complete_results() -> pd.DataFrame:
     if not MAXPPA_COMPLETE_RESULTS_PATH.exists():
         return pd.DataFrame()
-    return pd.read_csv(MAXPPA_COMPLETE_RESULTS_PATH).sort_values(
+    df = pd.read_csv(MAXPPA_COMPLETE_RESULTS_PATH).sort_values(
         ["variant", "config_index"]
     )
+    df["lsb_strategy"] = df["variant"]
+    df["lsb_group"] = df["variant"].apply(classify_lsb_group)
+    return df
+
+
+def classify_lsb_group(variant: str) -> str:
+    if variant in CORE_LSB_VARIANTS:
+        return "Core LSB: COPY / TRUNC / LOA"
+    if variant == "HEAA":
+        return "Incomplete audit: HEAA"
+    return "Experimental LSB approximators"
 
 
 def render_metric_card(label: str, value: str, detail: str) -> None:
@@ -543,6 +579,7 @@ def build_maxppa_complete_scatter(
     y: str,
     y_label: str,
     selected_variants: list[str],
+    show_legend: bool = False,
 ) -> px.scatter:
     fig = px.scatter(
         data,
@@ -554,6 +591,7 @@ def build_maxppa_complete_scatter(
         hover_data={
             "architecture": True,
             "variant": True,
+            "lsb_group": True,
             "m_bits": True,
             "l_bits": True,
             "k_bits": True,
@@ -571,7 +609,7 @@ def build_maxppa_complete_scatter(
     )
     fig.update_layout(
         height=390,
-        showlegend=False,
+        showlegend=show_legend,
         paper_bgcolor="#ffffff",
         plot_bgcolor="#ffffff",
         margin=dict(l=8, r=8, t=8, b=8),
@@ -595,7 +633,7 @@ def build_maxppa_complete_scatter(
 
 
 def build_maxppa_rank_bar(data: pd.DataFrame, metric: str, label: str) -> px.bar:
-    top = data.sort_values(metric, ascending=False).head(15).copy()
+    top = sort_by_metric(data, metric).head(15).copy()
     top["label"] = top.apply(
         lambda row: (
             f"{row['variant']} | M={int(row['m_bits'])}, "
@@ -665,6 +703,142 @@ def mark_pareto_candidates(
 
 def format_count(value: int) -> str:
     return f"{value:,}".replace(",", ".")
+
+
+def sort_by_metric(data: pd.DataFrame, metric: str) -> pd.DataFrame:
+    return data.sort_values(
+        metric,
+        ascending=metric in LOWER_IS_BETTER_METRICS,
+    )
+
+
+def select_chart_rows(
+    data: pd.DataFrame,
+    display_mode: str,
+    ranking_metric: str,
+    top_n: int,
+) -> pd.DataFrame:
+    if data.empty or display_mode == "All filtered architectures":
+        return data.copy()
+
+    if display_mode == "Pareto candidates only":
+        pareto_input = data.copy()
+        pareto_metric = ranking_metric
+        if ranking_metric in LOWER_IS_BETTER_METRICS:
+            pareto_metric = "_pareto_value"
+            pareto_input[pareto_metric] = -pareto_input[ranking_metric]
+        pareto = mark_pareto_candidates(pareto_input, pareto_metric)
+        return data[pareto].copy()
+
+    ranked = sort_by_metric(data, ranking_metric)
+    if display_mode == "Best architecture per variant":
+        return ranked.groupby("variant", observed=True).head(1).copy()
+
+    return ranked.head(top_n).copy()
+
+
+def build_lsb_trio_line(
+    data: pd.DataFrame,
+    metric: str,
+    metric_label: str,
+) -> px.line:
+    ordered = data.sort_values(["config_index", "variant"]).copy()
+    fig = px.line(
+        ordered,
+        x="config_index",
+        y=metric,
+        color="variant",
+        markers=True,
+        color_discrete_map=VARIANT_COLORS,
+        category_orders={"variant": CORE_LSB_VARIANTS},
+        hover_data={
+            "variant": True,
+            "m_bits": True,
+            "l_bits": True,
+            "k_bits": True,
+            "mred": ":.6f",
+            "total_power_reduction_pct": ":.2f",
+            "total_area_reduction_pct": ":.2f",
+            "ppa_gain_pct": ":.2f",
+        },
+    )
+    fig.update_traces(line={"width": 2.2}, marker={"size": 6})
+    fig.update_layout(
+        height=430,
+        paper_bgcolor="#ffffff",
+        plot_bgcolor="#ffffff",
+        margin=dict(l=8, r=8, t=8, b=8),
+        legend={
+            "orientation": "h",
+            "yanchor": "bottom",
+            "y": 1.02,
+            "xanchor": "left",
+            "x": 0,
+            "title": None,
+            "font": {"color": "#111827", "size": 11},
+        },
+        font=dict(color="#1f2937", family="Segoe UI"),
+    )
+    fig.update_xaxes(
+        title="Configuration index",
+        title_font={"color": "#1f2937", "size": 12},
+        tickfont={"color": "#475569", "size": 11},
+        gridcolor="#dfe4ec",
+        zeroline=False,
+    )
+    fig.update_yaxes(
+        title=metric_label,
+        title_font={"color": "#1f2937", "size": 12},
+        tickfont={"color": "#475569", "size": 11},
+        gridcolor="#dfe4ec",
+        zeroline=False,
+    )
+    return fig
+
+
+def build_lsb_config_bar(data: pd.DataFrame, metric: str, metric_label: str) -> px.bar:
+    ranked = sort_by_metric(data, metric)
+    fig = px.bar(
+        ranked,
+        x="variant",
+        y=metric,
+        color="variant",
+        color_discrete_map=VARIANT_COLORS,
+        category_orders={"variant": CORE_LSB_VARIANTS},
+        hover_data={
+            "architecture": True,
+            "m_bits": True,
+            "l_bits": True,
+            "k_bits": True,
+            "mred": ":.6f",
+            "total_power_reduction_pct": ":.2f",
+            "total_area_reduction_pct": ":.2f",
+            "ppa_gain_pct": ":.2f",
+        },
+    )
+    fig.update_layout(
+        height=360,
+        showlegend=False,
+        paper_bgcolor="#ffffff",
+        plot_bgcolor="#ffffff",
+        margin=dict(l=8, r=8, t=8, b=8),
+        font=dict(color="#1f2937", family="Segoe UI"),
+    )
+    fig.update_xaxes(
+        title="LSB approximation",
+        title_font={"color": "#1f2937", "size": 12},
+        tickfont={"color": "#475569", "size": 11},
+        gridcolor="#dfe4ec",
+        zeroline=False,
+    )
+    fig.update_yaxes(
+        title=metric_label,
+        title_font={"color": "#1f2937", "size": 12},
+        tickfont={"color": "#475569", "size": 11},
+        gridcolor="#dfe4ec",
+        zeroline=False,
+    )
+    return fig
 
 
 def architecture_label(row: pd.Series) -> str:
@@ -754,11 +928,43 @@ with variant_col:
                 maxppa_base["included_in_dashboard"] == 1
             ].copy()
 
+        lsb_group_options = [
+            group
+            for group in [
+                "Core LSB: COPY / TRUNC / LOA",
+                "Experimental LSB approximators",
+                "Incomplete audit: HEAA",
+            ]
+            if group in set(maxppa_base["lsb_group"])
+        ]
+        selected_lsb_groups = st.multiselect(
+            "LSB approximation group",
+            options=lsb_group_options,
+            default=[
+                group for group in [
+                    "Core LSB: COPY / TRUNC / LOA",
+                    "Experimental LSB approximators",
+                ]
+                if group in lsb_group_options
+            ],
+            help=(
+                "Use this to compare the LSB approximator family. COPY, TRUNC "
+                "and LOA are the core M-AxPPA choices."
+            ),
+        )
+        if not selected_lsb_groups:
+            selected_lsb_groups = lsb_group_options
+
+        grouped_base = maxppa_base[
+            maxppa_base["lsb_group"].isin(selected_lsb_groups)
+        ].copy()
+
+        max_mred_limit = float(round(max(maxppa_base["mred"].max(), 0.01) + 0.01, 2))
         max_mred = st.slider(
             "Maximum MRED",
             min_value=0.00,
-            max_value=DEFAULT_MAXPPA_MAX_MRED,
-            value=DEFAULT_MAXPPA_MAX_MRED,
+            max_value=max_mred_limit,
+            value=min(DEFAULT_MAXPPA_MAX_MRED, max_mred_limit),
             step=0.01,
             format="%.2f",
             help="Lower this limit when you want stricter error tolerance.",
@@ -769,34 +975,150 @@ with variant_col:
         maxppa_available = [
             variant
             for variant in MAXPPA_VARIANT_ORDER
-            if variant in set(maxppa_base["variant"])
+            if variant in set(grouped_base["variant"])
         ]
-        selected_maxppa_variants = []
-        for variant in maxppa_available:
-            dot_col, check_col = st.columns([0.14, 0.86], gap="small")
-            with dot_col:
-                st.markdown(
-                    f"""
-                    <div class="variant-dot-wrap">
-                      <span class="variant-filter-dot" style="background:{VARIANT_COLORS.get(variant, '#64748B')}"></span>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-            with check_col:
-                if st.checkbox(
-                    variant,
-                    value=True,
-                    key=f"maxppa_variant_{variant}",
-                ):
-                    selected_maxppa_variants.append(variant)
+        preset = st.selectbox(
+            "Variant preset",
+            [
+                "COPY × TRUNC × LOA",
+                "All selected groups",
+                "Experimental only",
+                "Custom selection",
+            ],
+            help="Quickly switch between a clean LSB comparison and the full architecture set.",
+        )
+        if preset == "COPY × TRUNC × LOA":
+            default_variants = [
+                variant for variant in CORE_LSB_VARIANTS if variant in maxppa_available
+            ]
+        elif preset == "Experimental only":
+            default_variants = [
+                variant
+                for variant in maxppa_available
+                if variant not in CORE_LSB_VARIANTS
+            ]
+        else:
+            default_variants = maxppa_available
+
+        selected_maxppa_variants = st.multiselect(
+            "Individual variants",
+            options=maxppa_available,
+            default=default_variants,
+            key=f"maxppa_variants_{preset}",
+            help="Add/remove specific LSB approximators from the main charts.",
+        )
+        if not selected_maxppa_variants:
+            selected_maxppa_variants = default_variants or maxppa_available
+
+        render_legend(selected_maxppa_variants)
+
+        with st.expander("Bit partition filters", expanded=False):
+            m_options = sorted(grouped_base["m_bits"].dropna().astype(int).unique())
+            l_options = sorted(grouped_base["l_bits"].dropna().astype(int).unique())
+            k_options = sorted(grouped_base["k_bits"].dropna().astype(int).unique())
+
+            selected_m_values = st.multiselect(
+                "Exact MSB values (M)",
+                options=m_options,
+                default=m_options,
+            )
+            selected_l_values = st.multiselect(
+                "AxPPA intermediate values (L)",
+                options=l_options,
+                default=l_options,
+            )
+            selected_k_values = st.multiselect(
+                "Approximated LSB values (K)",
+                options=k_options,
+                default=k_options,
+            )
+
+        if not selected_m_values:
+            selected_m_values = m_options
+        if not selected_l_values:
+            selected_l_values = l_options
+        if not selected_k_values:
+            selected_k_values = k_options
+
+        with st.expander("Reduction filters", expanded=False):
+            min_power_reduction = st.slider(
+                "Minimum power reduction (%)",
+                min_value=float(grouped_base["total_power_reduction_pct"].min()),
+                max_value=float(grouped_base["total_power_reduction_pct"].max()),
+                value=float(grouped_base["total_power_reduction_pct"].min()),
+                step=1.0,
+            )
+            min_area_reduction = st.slider(
+                "Minimum area reduction (%)",
+                min_value=float(grouped_base["total_area_reduction_pct"].min()),
+                max_value=float(grouped_base["total_area_reduction_pct"].max()),
+                value=float(grouped_base["total_area_reduction_pct"].min()),
+                step=1.0,
+            )
+            min_ppa_gain = st.slider(
+                "Minimum PPA gain (%)",
+                min_value=float(grouped_base["ppa_gain_pct"].min()),
+                max_value=float(grouped_base["ppa_gain_pct"].max()),
+                value=float(grouped_base["ppa_gain_pct"].min()),
+                step=1.0,
+            )
+
+        st.markdown('<div class="filter-divider"></div>', unsafe_allow_html=True)
+
+        primary_metric_label = st.selectbox(
+            "Primary ranking metric",
+            options=list(MAXPPA_METRICS.keys()),
+            index=0,
+        )
+        primary_metric = MAXPPA_METRICS[primary_metric_label]
+
+        graph_display_mode = st.radio(
+            "Graph density",
+            [
+                "Best architecture per variant",
+                "Top N architectures",
+                "Pareto candidates only",
+                "All filtered architectures",
+            ],
+            index=1,
+        )
+        top_n = st.slider(
+            "Top N plotted",
+            min_value=10,
+            max_value=500,
+            value=120,
+            step=10,
+            help="Used when graph density is set to Top N.",
+        )
+        left_metric_label = st.selectbox(
+            "Left chart metric",
+            options=list(MAXPPA_METRICS.keys()),
+            index=1,
+        )
+        right_metric_label = st.selectbox(
+            "Right chart metric",
+            options=list(MAXPPA_METRICS.keys()),
+            index=2,
+        )
+        left_metric = MAXPPA_METRICS[left_metric_label]
+        right_metric = MAXPPA_METRICS[right_metric_label]
+        show_graph_legend = st.checkbox("Show chart legend", value=False)
 
 if not selected_maxppa_variants:
     selected_maxppa_variants = maxppa_available
 
-maxppa_view = maxppa_base[
-    maxppa_base["variant"].isin(selected_maxppa_variants)
-    & (maxppa_base["mred"] <= max_mred)
+filtered_by_structure = grouped_base[
+    grouped_base["m_bits"].isin(selected_m_values)
+    & grouped_base["l_bits"].isin(selected_l_values)
+    & grouped_base["k_bits"].isin(selected_k_values)
+    & (grouped_base["mred"] <= max_mred)
+    & (grouped_base["total_power_reduction_pct"] >= min_power_reduction)
+    & (grouped_base["total_area_reduction_pct"] >= min_area_reduction)
+    & (grouped_base["ppa_gain_pct"] >= min_ppa_gain)
+].copy()
+
+maxppa_view = filtered_by_structure[
+    filtered_by_structure["variant"].isin(selected_maxppa_variants)
 ].copy()
 maxppa_view["variant"] = pd.Categorical(
     maxppa_view["variant"],
@@ -804,39 +1126,78 @@ maxppa_view["variant"] = pd.Categorical(
     ordered=True,
 )
 
+chart_view = select_chart_rows(
+    maxppa_view,
+    graph_display_mode,
+    primary_metric,
+    top_n,
+)
+chart_view["variant"] = pd.Categorical(
+    chart_view["variant"],
+    categories=MAXPPA_VARIANT_ORDER,
+    ordered=True,
+)
+
+lsb_trio_view = filtered_by_structure[
+    filtered_by_structure["variant"].isin(CORE_LSB_VARIANTS)
+].copy()
+lsb_trio_view["variant"] = pd.Categorical(
+    lsb_trio_view["variant"],
+    categories=CORE_LSB_VARIANTS,
+    ordered=True,
+)
+
 with content_col:
-    metric_col_1, metric_col_2, metric_col_3, metric_col_4 = st.columns(4, gap="large")
+    metric_col_1, metric_col_2, metric_col_3, metric_col_4, metric_col_5 = st.columns(
+        5,
+        gap="large",
+    )
     with metric_col_1:
         if maxppa_view.empty:
             render_metric_card("Displayed Architectures", "0", "No rows match filters")
         else:
             render_metric_card(
-                "Displayed Architectures",
+                "Filtered Architectures",
                 format_count(len(maxppa_view)),
-                "M-AxPPA rows after filters",
+                "Rows matching all filters",
             )
 
     with metric_col_2:
+        if maxppa_view.empty:
+            render_metric_card("Plotted Points", "-", "Adjust filters")
+        else:
+            render_metric_card(
+                "Plotted Points",
+                format_count(len(chart_view)),
+                graph_display_mode,
+            )
+
+    with metric_col_3:
         if maxppa_view.empty:
             render_metric_card("Variants", "-", "Adjust filters")
         else:
             render_metric_card(
                 "Variants",
                 str(maxppa_view["variant"].nunique()),
-                "Complete variants by default",
-            )
-
-    with metric_col_3:
-        if maxppa_view.empty:
-            render_metric_card("Best PPA Gain", "-", "Adjust filters")
-        else:
-            render_metric_card(
-                "Best PPA Gain",
-                f"{maxppa_view['ppa_gain_pct'].max():.2f}%",
-                f"Within MRED <= {max_mred:.2f}",
+                "Selected approximators",
             )
 
     with metric_col_4:
+        if maxppa_view.empty:
+            render_metric_card("Best Metric", "-", "Adjust filters")
+        else:
+            best_metric_value = sort_by_metric(maxppa_view, primary_metric).iloc[0][
+                primary_metric
+            ]
+            render_metric_card(
+                "Best Metric",
+                f"{best_metric_value:.4f}"
+                if primary_metric == "mred"
+                else f"{best_metric_value:.2f}",
+                primary_metric_label,
+            )
+
+    with metric_col_5:
         if maxppa_view.empty:
             render_metric_card("Lowest MRED", "-", "Adjust filters")
         else:
@@ -854,52 +1215,147 @@ with content_col:
         with power_col:
             with st.container(border=True):
                 st.markdown(
-                    """
-                    <p class="chart-title">Power Reduction (%) vs Error (MRED)</p>
-                    <p class="chart-subtitle">Updated main view from extracted M-AxPPA synthesis reports.</p>
+                    f"""
+                    <p class="chart-title">{MAXPPA_METRIC_LABELS[left_metric]} vs Error (MRED)</p>
+                    <p class="chart-subtitle">Main view from extracted M-AxPPA synthesis reports. Display mode: {graph_display_mode}.</p>
                     """,
                     unsafe_allow_html=True,
                 )
                 st.plotly_chart(
                     build_maxppa_complete_scatter(
-                        maxppa_view,
-                        "total_power_reduction_pct",
-                        "Total power reduction (%)",
+                        chart_view,
+                        left_metric,
+                        MAXPPA_METRIC_LABELS[left_metric],
                         selected_maxppa_variants,
+                        show_graph_legend,
                     ),
                 )
 
         with area_col:
             with st.container(border=True):
                 st.markdown(
-                    """
-                    <p class="chart-title">Area Reduction (%) vs Error (MRED)</p>
-                    <p class="chart-subtitle">Updated main view from total area reduction versus the precise baseline.</p>
+                    f"""
+                    <p class="chart-title">{MAXPPA_METRIC_LABELS[right_metric]} vs Error (MRED)</p>
+                    <p class="chart-subtitle">Main view from extracted M-AxPPA synthesis reports. Display mode: {graph_display_mode}.</p>
                     """,
                     unsafe_allow_html=True,
                 )
                 st.plotly_chart(
                     build_maxppa_complete_scatter(
-                        maxppa_view,
-                        "total_area_reduction_pct",
-                        "Total area reduction (%)",
+                        chart_view,
+                        right_metric,
+                        MAXPPA_METRIC_LABELS[right_metric],
                         selected_maxppa_variants,
+                        show_graph_legend,
                     ),
                 )
 
 if not maxppa_view.empty:
-    tab_names = ["Rankings", "Pareto", "Synthesis Details"]
+    tab_names = ["LSB Trio Compare", "Rankings", "Pareto", "Synthesis Details"]
     if not hybrid_variants_df.empty:
         tab_names.append("MATLAB Hybrid Accuracy")
     if not legacy_df.empty:
         tab_names.append("Legacy Synthetic Data")
 
     tabs = dict(zip(tab_names, st.tabs(tab_names)))
+    lsb_trio_tab = tabs["LSB Trio Compare"]
     ranking_tab = tabs["Rankings"]
     pareto_tab = tabs["Pareto"]
     synthesis_tab = tabs["Synthesis Details"]
     hybrid_tab = tabs.get("MATLAB Hybrid Accuracy")
     legacy_tab = tabs.get("Legacy Synthetic Data")
+
+    with lsb_trio_tab:
+        st.info(
+            "Direct comparison of the three core M-AxPPA LSB choices: COPY, "
+            "TRUNC and LOA. This tab uses the same M/L/K, MRED and reduction "
+            "filters, but always focuses on the LSB trio."
+        )
+        if lsb_trio_view.empty:
+            st.warning("No COPY/TRUNC/LOA rows match the current filters.")
+        else:
+            trio_metric_label = st.selectbox(
+                "Metric for COPY × TRUNC × LOA comparison",
+                options=list(MAXPPA_METRICS.keys()),
+                index=list(MAXPPA_METRICS.keys()).index(primary_metric_label),
+            )
+            trio_metric = MAXPPA_METRICS[trio_metric_label]
+
+            trio_line_col, trio_config_col = st.columns(2, gap="large")
+            with trio_line_col:
+                with st.container(border=True):
+                    st.markdown(
+                        f"""
+                        <p class="chart-title">COPY × TRUNC × LOA across configurations</p>
+                        <p class="chart-subtitle">Same bit-partition filters; changing only the LSB approximator.</p>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                    st.plotly_chart(
+                        build_lsb_trio_line(
+                            lsb_trio_view,
+                            trio_metric,
+                            MAXPPA_METRIC_LABELS[trio_metric],
+                        )
+                    )
+
+            config_table = (
+                lsb_trio_view[["config_index", "m_bits", "l_bits", "k_bits"]]
+                .drop_duplicates()
+                .sort_values(["m_bits", "l_bits", "k_bits"])
+            )
+            config_labels = {
+                f"M={int(row.m_bits)}, L={int(row.l_bits)}, K={int(row.k_bits)}"
+                f" | config {int(row.config_index)}": int(row.config_index)
+                for row in config_table.itertuples(index=False)
+            }
+            default_config_label = next(iter(config_labels))
+            selected_config_label = st.selectbox(
+                "Choose one M/L/K split for side-by-side bars",
+                options=list(config_labels.keys()),
+                index=list(config_labels.keys()).index(default_config_label),
+            )
+            selected_config = config_labels[selected_config_label]
+            selected_config_rows = lsb_trio_view[
+                lsb_trio_view["config_index"] == selected_config
+            ].copy()
+
+            with trio_config_col:
+                with st.container(border=True):
+                    st.markdown(
+                        f"""
+                        <p class="chart-title">Selected split: {selected_config_label}</p>
+                        <p class="chart-subtitle">Side-by-side result for COPY, TRUNC and LOA.</p>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                    st.plotly_chart(
+                        build_lsb_config_bar(
+                            selected_config_rows,
+                            trio_metric,
+                            MAXPPA_METRIC_LABELS[trio_metric],
+                        )
+                    )
+
+            st.dataframe(
+                lsb_trio_view[
+                    [
+                        "architecture",
+                        "variant",
+                        "config_index",
+                        "m_bits",
+                        "l_bits",
+                        "k_bits",
+                        "mred",
+                        "total_power_reduction_pct",
+                        "total_area_reduction_pct",
+                        "critical_delay_ns",
+                        "ppa_gain_pct",
+                    ]
+                ].sort_values(["config_index", "variant"]),
+                width="stretch",
+                hide_index=True,
+            )
 
     with ranking_tab:
         ranking_metric_complete = st.radio(
@@ -1020,6 +1476,7 @@ if not maxppa_view.empty:
                 summary = (
                     maxppa_view.groupby("variant", observed=True)
                     .agg(
+                        lsb_group=("lsb_group", "first"),
                         architectures=("architecture", "count"),
                         min_mred=("mred", "min"),
                         max_power_reduction_pct=(
@@ -1047,6 +1504,7 @@ if not maxppa_view.empty:
         table_columns = [
             "architecture",
             "variant",
+            "lsb_group",
             "config_index",
             "m_bits",
             "l_bits",
