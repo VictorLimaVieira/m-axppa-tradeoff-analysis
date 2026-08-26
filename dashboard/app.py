@@ -92,7 +92,8 @@ MAXPPA_METRICS = {
     "Energy reduction (%)": "energy_reduction_pct",
     "PDP reduction (%)": "pdp_reduction_pct",
     "Critical delay (ns)": "critical_delay_ns",
-    "Exact accuracy (%)": "exact_accuracy_pct",
+    "MRED-based accuracy (%)": "mred_accuracy_pct",
+    "Exact-match rate (%)": "exact_accuracy_pct",
     "Error (MRED)": "mred",
 }
 
@@ -103,7 +104,8 @@ MAXPPA_METRIC_LABELS = {
     "energy_reduction_pct": "Energy reduction (%)",
     "pdp_reduction_pct": "PDP reduction (%)",
     "critical_delay_ns": "Critical delay (ns)",
-    "exact_accuracy_pct": "Exact accuracy (%)",
+    "mred_accuracy_pct": "MRED-based accuracy (%)",
+    "exact_accuracy_pct": "Exact-match rate (%)",
     "mred": "Error (MRED)",
 }
 
@@ -500,6 +502,7 @@ def load_maxppa_complete_results() -> pd.DataFrame:
     df = pd.read_csv(MAXPPA_COMPLETE_RESULTS_PATH).sort_values(
         ["variant", "config_index"]
     )
+    df["mred_accuracy_pct"] = (100 * (1 - df["mred"])).clip(lower=0, upper=100)
     df["lsb_strategy"] = df["variant"]
     df["lsb_group"] = df["variant"].apply(classify_lsb_group)
     return df
@@ -1150,7 +1153,7 @@ with st.container(border=True):
             "Primary metric",
             options=list(MAXPPA_METRICS.keys()),
             index=0,
-            help="Used by ranking, Top N and best-per-variant views.",
+            help="Used by rankings and by the Top architecture views.",
         )
         primary_metric = MAXPPA_METRICS[primary_metric_label]
         st.markdown(
@@ -1200,7 +1203,7 @@ with st.container(border=True):
     with st.expander("Variant colors", expanded=False):
         render_legend(selected_maxppa_variants)
 
-    chart_filter_cols = st.columns([0.85, 1.05, 1.05, 0.8], gap="large")
+    chart_filter_cols = st.columns([0.85, 1.15, 1.15, 0.65], gap="large")
     with chart_filter_cols[0]:
         max_mred_limit = float(round(max(maxppa_base["mred"].max(), 0.01) + 0.01, 2))
         max_mred = st.slider(
@@ -1213,17 +1216,30 @@ with st.container(border=True):
         )
 
     with chart_filter_cols[1]:
-        graph_display_mode = st.radio(
-            "Graph density",
+        graph_display_label = st.selectbox(
+            "Graph view",
             [
+                "Top 100 architectures",
+                "Top 250 architectures",
                 "Best architecture per variant",
-                "Top N architectures",
                 "Pareto candidates only",
                 "All filtered architectures",
             ],
             index=0,
-            horizontal=False,
+            help=(
+                "Top views show the best architectures for the selected primary "
+                "metric. Use 'All filtered' only when you really want every point."
+            ),
         )
+        if graph_display_label == "Top 100 architectures":
+            graph_display_mode = "Top N architectures"
+            top_n = 100
+        elif graph_display_label == "Top 250 architectures":
+            graph_display_mode = "Top N architectures"
+            top_n = 250
+        else:
+            graph_display_mode = graph_display_label
+            top_n = len(grouped_base)
 
     with chart_filter_cols[2]:
         left_metric_label = st.selectbox(
@@ -1240,68 +1256,128 @@ with st.container(border=True):
         right_metric = MAXPPA_METRICS[right_metric_label]
 
     with chart_filter_cols[3]:
-        top_n = st.slider(
-            "Top N plotted",
-            min_value=10,
-            max_value=500,
-            value=80,
-            step=10,
-            help="Used only when graph density is set to Top N.",
-        )
         show_graph_legend = st.checkbox("Show chart legend", value=False)
 
-    with st.expander("Advanced filters: bit split and minimum reductions", expanded=False):
-        m_options = sorted(grouped_base["m_bits"].dropna().astype(int).unique())
-        l_options = sorted(grouped_base["l_bits"].dropna().astype(int).unique())
-        k_options = sorted(grouped_base["k_bits"].dropna().astype(int).unique())
+    m_options = sorted(grouped_base["m_bits"].dropna().astype(int).unique())
+    l_options = sorted(grouped_base["l_bits"].dropna().astype(int).unique())
+    k_options = sorted(grouped_base["k_bits"].dropna().astype(int).unique())
+    selected_m_values = m_options
+    selected_l_values = l_options
+    selected_k_values = k_options
 
-        bit_cols = st.columns(3, gap="large")
-        with bit_cols[0]:
-            selected_m_values = st.multiselect(
-                "Exact region M",
-                options=m_options,
-                default=m_options,
-                help="Number of most-significant bits kept exact.",
-            )
-        with bit_cols[1]:
-            selected_l_values = st.multiselect(
-                "AxPPA region L",
-                options=l_options,
-                default=l_options,
-                help="Number of intermediate bits handled by AxPPA.",
-            )
-        with bit_cols[2]:
-            selected_k_values = st.multiselect(
-                "Approximated region K",
-                options=k_options,
-                default=k_options,
-                help="Number of least-significant bits handled by the selected approximation.",
-            )
+    min_power_reduction = (
+        float(grouped_base["total_power_reduction_pct"].min())
+        if not grouped_base.empty
+        else 0.0
+    )
+    min_area_reduction = (
+        float(grouped_base["total_area_reduction_pct"].min())
+        if not grouped_base.empty
+        else 0.0
+    )
+    min_ppa_gain = (
+        float(grouped_base["ppa_gain_pct"].min())
+        if not grouped_base.empty
+        else 0.0
+    )
 
-        reduction_cols = st.columns(3, gap="large")
-        with reduction_cols[0]:
-            min_power_reduction = st.slider(
-                "Minimum power reduction (%)",
-                min_value=float(grouped_base["total_power_reduction_pct"].min()),
-                max_value=float(grouped_base["total_power_reduction_pct"].max()),
-                value=float(grouped_base["total_power_reduction_pct"].min()),
-                step=1.0,
+    with st.expander("Optional filters: bit split and minimum targets", expanded=False):
+        st.markdown(
+            """
+            <div class="control-help">
+            Leave this closed for the normal comparison. Use it only for a
+            specific question, for example: “what happens when more MSBs are
+            exact?”, “what happens when more LSBs are approximated?”, or “only
+            show architectures above a minimum power/area reduction”.
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        bit_filter_mode = st.radio(
+            "Bit split preset",
+            [
+                "All bit splits (recommended)",
+                "Accuracy-oriented: larger exact M",
+                "Savings-oriented: larger approximated K",
+                "Manual M/L/K selection",
+            ],
+            horizontal=True,
+        )
+
+        if bit_filter_mode == "Accuracy-oriented: larger exact M":
+            selected_m_values = [value for value in m_options if value >= 8] or m_options
+            st.caption(
+                "Keeps only architectures with a larger exact MSB region "
+                "(M ≥ 8). Use this when accuracy is the priority."
             )
-        with reduction_cols[1]:
-            min_area_reduction = st.slider(
-                "Minimum area reduction (%)",
-                min_value=float(grouped_base["total_area_reduction_pct"].min()),
-                max_value=float(grouped_base["total_area_reduction_pct"].max()),
-                value=float(grouped_base["total_area_reduction_pct"].min()),
-                step=1.0,
+        elif bit_filter_mode == "Savings-oriented: larger approximated K":
+            selected_k_values = [value for value in k_options if value >= 8] or k_options
+            st.caption(
+                "Keeps only architectures with a larger approximated LSB region "
+                "(K ≥ 8). Use this when area/power saving is the priority."
             )
-        with reduction_cols[2]:
-            min_ppa_gain = st.slider(
-                "Minimum PPA gain (%)",
-                min_value=float(grouped_base["ppa_gain_pct"].min()),
-                max_value=float(grouped_base["ppa_gain_pct"].max()),
-                value=float(grouped_base["ppa_gain_pct"].min()),
-                step=1.0,
+        elif bit_filter_mode == "Manual M/L/K selection":
+            bit_cols = st.columns(3, gap="large")
+            with bit_cols[0]:
+                selected_m_values = st.multiselect(
+                    "Exact region M",
+                    options=m_options,
+                    default=m_options,
+                    help="Number of most-significant bits kept exact.",
+                )
+            with bit_cols[1]:
+                selected_l_values = st.multiselect(
+                    "AxPPA region L",
+                    options=l_options,
+                    default=l_options,
+                    help="Number of intermediate bits handled by AxPPA.",
+                )
+            with bit_cols[2]:
+                selected_k_values = st.multiselect(
+                    "Approximated region K",
+                    options=k_options,
+                    default=k_options,
+                    help="Number of least-significant bits handled by the selected approximation.",
+                )
+
+        use_target_filters = st.checkbox(
+            "Use minimum saving/PPA targets",
+            value=False,
+            help=(
+                "Turn this on only if you want to hide architectures below "
+                "specific reduction targets."
+            ),
+        )
+        if use_target_filters:
+            reduction_cols = st.columns(3, gap="large")
+            with reduction_cols[0]:
+                min_power_reduction = st.slider(
+                    "Minimum power reduction (%)",
+                    min_value=float(grouped_base["total_power_reduction_pct"].min()),
+                    max_value=float(grouped_base["total_power_reduction_pct"].max()),
+                    value=float(grouped_base["total_power_reduction_pct"].min()),
+                    step=1.0,
+                )
+            with reduction_cols[1]:
+                min_area_reduction = st.slider(
+                    "Minimum area reduction (%)",
+                    min_value=float(grouped_base["total_area_reduction_pct"].min()),
+                    max_value=float(grouped_base["total_area_reduction_pct"].max()),
+                    value=float(grouped_base["total_area_reduction_pct"].min()),
+                    step=1.0,
+                )
+            with reduction_cols[2]:
+                min_ppa_gain = st.slider(
+                    "Minimum PPA gain (%)",
+                    min_value=float(grouped_base["ppa_gain_pct"].min()),
+                    max_value=float(grouped_base["ppa_gain_pct"].max()),
+                    value=float(grouped_base["ppa_gain_pct"].min()),
+                    step=1.0,
+                )
+        else:
+            st.caption(
+                "No minimum targets are applied. The only top-level numeric "
+                "cutoff is Maximum MRED."
             )
 
     if not selected_m_values:
@@ -1384,7 +1460,7 @@ with metric_col_2:
         render_metric_card(
             "Plotted Points",
             format_count(len(chart_view)),
-            graph_display_mode,
+            graph_display_label,
         )
 
 with metric_col_3:
@@ -1432,7 +1508,7 @@ else:
             st.markdown(
                 f"""
                 <p class="chart-title">{MAXPPA_METRIC_LABELS[left_metric]} vs Error (MRED)</p>
-                <p class="chart-subtitle">Main view from extracted M-AxPPA synthesis reports. Display mode: {graph_display_mode}.{point_note}</p>
+                <p class="chart-subtitle">Main view from extracted M-AxPPA synthesis reports. Display mode: {graph_display_label}.{point_note}</p>
                 """,
                 unsafe_allow_html=True,
             )
@@ -1453,7 +1529,7 @@ else:
             st.markdown(
                 f"""
                 <p class="chart-title">{MAXPPA_METRIC_LABELS[right_metric]} vs Error (MRED)</p>
-                <p class="chart-subtitle">Main view from extracted M-AxPPA synthesis reports. Display mode: {graph_display_mode}.{point_note}</p>
+                <p class="chart-subtitle">Main view from extracted M-AxPPA synthesis reports. Display mode: {graph_display_label}.{point_note}</p>
                 """,
                 unsafe_allow_html=True,
             )
@@ -1500,6 +1576,19 @@ if not maxppa_view.empty:
                 index=list(MAXPPA_METRICS.keys()).index(primary_metric_label),
             )
             trio_metric = MAXPPA_METRICS[trio_metric_label]
+            if trio_metric == "exact_accuracy_pct":
+                st.caption(
+                    "Exact-match rate is strict: it counts only operations whose "
+                    "approximate sum equals the precise sum exactly. A 0.00 value "
+                    "does not mean the result is unusable; it means no exact matches "
+                    "were observed for that split."
+                )
+            elif trio_metric == "mred_accuracy_pct":
+                st.caption(
+                    "MRED-based accuracy is derived from the extracted MRED "
+                    "as max(0, 100 × (1 − MRED)). It is useful for a more intuitive "
+                    "closeness view, while the raw MRED remains available."
+                )
 
             trio_line_col, trio_config_col = st.columns(2, gap="large")
             with trio_line_col:
@@ -1571,6 +1660,7 @@ if not maxppa_view.empty:
                     "l_bits",
                     "k_bits",
                     "mred",
+                    "mred_accuracy_pct",
                     "exact_accuracy_pct",
                     "total_power_reduction_pct",
                     "total_area_reduction_pct",
@@ -1584,6 +1674,8 @@ if not maxppa_view.empty:
                     "m_bits": "M_exact_bits",
                     "l_bits": "L_AxPPA_bits",
                     "k_bits": "K_LSB_bits",
+                    "mred_accuracy_pct": "MRED_based_accuracy_pct",
+                    "exact_accuracy_pct": "exact_match_rate_pct",
                 }
             )
             st.dataframe(
@@ -1596,7 +1688,8 @@ if not maxppa_view.empty:
                         "L_AxPPA_bits",
                         "K_LSB_bits",
                         "mred",
-                        "exact_accuracy_pct",
+                        "MRED_based_accuracy_pct",
+                        "exact_match_rate_pct",
                         "total_power_reduction_pct",
                         "total_area_reduction_pct",
                         "critical_delay_ns",
@@ -1771,6 +1864,7 @@ if not maxppa_view.empty:
             "l_bits",
             "k_bits",
             "mred",
+            "mred_accuracy_pct",
             "exact_accuracy_pct",
             "total_power_reduction_pct",
             "total_area_reduction_pct",
