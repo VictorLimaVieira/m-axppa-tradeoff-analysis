@@ -1062,13 +1062,6 @@ legacy_df = load_data()
 hybrid_variants_df = load_hybrid_variants()
 maxppa_complete_df = load_maxppa_complete_results()
 
-incomplete_variants = (
-    maxppa_complete_df[maxppa_complete_df["complete_variant"] == 0]
-    .groupby("variant")[["observed_configurations", "expected_configurations"]]
-    .first()
-    .reset_index()
-)
-
 st.markdown(
     """
     <div class="hero">
@@ -1104,24 +1097,10 @@ with st.container(border=True):
         unsafe_allow_html=True,
     )
 
-    if not incomplete_variants.empty:
-        details = ", ".join(
-            f"{row.variant}: {int(row.observed_configurations)}/"
-            f"{int(row.expected_configurations)}"
-            for row in incomplete_variants.itertuples(index=False)
-        )
-        st.markdown(
-            '<div class="audit-warning">'
-            "<strong>Audit note:</strong> incomplete variants stay out of the "
-            f"main view by default. Current incomplete set: {details}."
-            "</div>",
-            unsafe_allow_html=True,
-        )
-
-    main_filter_cols = st.columns([1.25, 1.0, 1.0], gap="large")
+    main_filter_cols = st.columns([1.35, 0.95, 1.05], gap="large")
     with main_filter_cols[0]:
         analysis_focus = st.selectbox(
-            "Analysis focus",
+            "Adder set",
             [
                 "All complete variants",
                 "Core LSB comparison: COPY / TRUNC / LOA",
@@ -1129,18 +1108,18 @@ with st.container(border=True):
                 "Manual variant selection",
             ],
             help=(
-                "Choose the comparison scope. Manual selection is the only mode "
-                "that opens an individual variant picker."
+                "Choose which adders enter the analysis. Manual selection is the "
+                "only mode that opens an individual variant picker."
             ),
         )
         st.markdown(
-            '<p class="compact-note">Use the core comparison when the question is specifically COPY vs TRUNC vs LOA.</p>',
+            '<p class="compact-note">Use COPY/TRUNC/LOA when the question is specifically the least-significant K-region method.</p>',
             unsafe_allow_html=True,
         )
 
     with main_filter_cols[1]:
         show_incomplete = st.checkbox(
-            "Include incomplete HEAA audit rows",
+            "Include incomplete HEAA rows",
             value=False,
             help=(
                 "HEAA is currently incomplete because 11 configurations were not "
@@ -1149,16 +1128,8 @@ with st.container(border=True):
         )
 
     with main_filter_cols[2]:
-        primary_metric_label = st.selectbox(
-            "Primary metric",
-            options=list(MAXPPA_METRICS.keys()),
-            index=0,
-            help="Used by rankings and by the Top architecture views.",
-        )
-        primary_metric = MAXPPA_METRICS[primary_metric_label]
         st.markdown(
-            '<p class="compact-note">Charts use exact extracted coordinates. '
-            "Stacked dots mean repeated equal values, not a drawing issue.</p>",
+            '<p class="compact-note">The professor-recommended cut is below: select a range of L and K, then compare every adder inside that same bit window.</p>',
             unsafe_allow_html=True,
         )
 
@@ -1203,8 +1174,71 @@ with st.container(border=True):
     with st.expander("Variant colors", expanded=False):
         render_legend(selected_maxppa_variants)
 
-    chart_filter_cols = st.columns([0.85, 1.15, 1.15, 0.65], gap="large")
+    m_options = sorted(grouped_base["m_bits"].dropna().astype(int).unique())
+    l_options = sorted(grouped_base["l_bits"].dropna().astype(int).unique())
+    k_options = sorted(grouped_base["k_bits"].dropna().astype(int).unique())
+    selected_m_values = m_options
+
+    chart_filter_cols = st.columns(3, gap="large")
     with chart_filter_cols[0]:
+        if l_options:
+            l_min = int(min(l_options))
+            l_max = int(max(l_options))
+            if l_min == l_max:
+                selected_l_range = (l_min, l_max)
+                st.caption(f"AxPPA L range: only L={l_min} is available.")
+            else:
+                selected_l_range = st.slider(
+                    "AxPPA L range",
+                    min_value=l_min,
+                    max_value=l_max,
+                    value=(l_min, l_max),
+                    step=1,
+                    help=(
+                        "Intermediate bits handled by AxPPA. All charts and "
+                        "Pareto calculations use only architectures inside this range."
+                    ),
+                )
+            selected_l_values = [
+                value
+                for value in l_options
+                if selected_l_range[0] <= value <= selected_l_range[1]
+            ]
+        else:
+            selected_l_range = (0, 0)
+            selected_l_values = []
+            st.caption("No L values available for this adder set.")
+
+    with chart_filter_cols[1]:
+        if k_options:
+            k_min = int(min(k_options))
+            k_max = int(max(k_options))
+            if k_min == k_max:
+                selected_k_range = (k_min, k_max)
+                st.caption(f"Approximated K range: only K={k_min} is available.")
+            else:
+                selected_k_range = st.slider(
+                    "Approximated K range",
+                    min_value=k_min,
+                    max_value=k_max,
+                    value=(k_min, k_max),
+                    step=1,
+                    help=(
+                        "Least-significant bits handled by the selected approximate "
+                        "adder. Power, area, accuracy and Pareto are filtered by this range."
+                    ),
+                )
+            selected_k_values = [
+                value
+                for value in k_options
+                if selected_k_range[0] <= value <= selected_k_range[1]
+            ]
+        else:
+            selected_k_range = (0, 0)
+            selected_k_values = []
+            st.caption("No K values available for this adder set.")
+
+    with chart_filter_cols[2]:
         max_mred_limit = float(round(max(maxppa_base["mred"].max(), 0.01) + 0.01, 2))
         max_mred = st.slider(
             "Maximum MRED",
@@ -1215,7 +1249,8 @@ with st.container(border=True):
             format="%.2f",
         )
 
-    with chart_filter_cols[1]:
+    display_filter_cols = st.columns([1.15, 1.15, 0.7], gap="large")
+    with display_filter_cols[0]:
         graph_display_label = st.selectbox(
             "Graph view",
             [
@@ -1227,8 +1262,8 @@ with st.container(border=True):
             ],
             index=0,
             help=(
-                "Top views show the best architectures for the selected primary "
-                "metric. Use 'All filtered' only when you really want every point."
+                "Controls how many filtered architectures are plotted. Use 'All "
+                "filtered' only when you really want every point."
             ),
         )
         if graph_display_label == "Top 100 architectures":
@@ -1241,144 +1276,21 @@ with st.container(border=True):
             graph_display_mode = graph_display_label
             top_n = len(grouped_base)
 
-    with chart_filter_cols[2]:
-        left_metric_label = st.selectbox(
-            "Left chart metric",
+    with display_filter_cols[1]:
+        primary_metric_label = st.selectbox(
+            "Rank/select points by",
             options=list(MAXPPA_METRICS.keys()),
-            index=1,
-        )
-        right_metric_label = st.selectbox(
-            "Right chart metric",
-            options=list(MAXPPA_METRICS.keys()),
-            index=2,
-        )
-        left_metric = MAXPPA_METRICS[left_metric_label]
-        right_metric = MAXPPA_METRICS[right_metric_label]
-
-    with chart_filter_cols[3]:
-        show_graph_legend = st.checkbox("Show chart legend", value=False)
-
-    m_options = sorted(grouped_base["m_bits"].dropna().astype(int).unique())
-    l_options = sorted(grouped_base["l_bits"].dropna().astype(int).unique())
-    k_options = sorted(grouped_base["k_bits"].dropna().astype(int).unique())
-    selected_m_values = m_options
-    selected_l_values = l_options
-    selected_k_values = k_options
-
-    min_power_reduction = (
-        float(grouped_base["total_power_reduction_pct"].min())
-        if not grouped_base.empty
-        else 0.0
-    )
-    min_area_reduction = (
-        float(grouped_base["total_area_reduction_pct"].min())
-        if not grouped_base.empty
-        else 0.0
-    )
-    min_ppa_gain = (
-        float(grouped_base["ppa_gain_pct"].min())
-        if not grouped_base.empty
-        else 0.0
-    )
-
-    with st.expander("Optional filters: bit split and minimum targets", expanded=False):
-        st.markdown(
-            """
-            <div class="control-help">
-            Leave this closed for the normal comparison. Use it only for a
-            specific question, for example: “what happens when more MSBs are
-            exact?”, “what happens when more LSBs are approximated?”, or “only
-            show architectures above a minimum power/area reduction”.
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        bit_filter_mode = st.radio(
-            "Bit split preset",
-            [
-                "All bit splits (recommended)",
-                "Accuracy-oriented: larger exact M",
-                "Savings-oriented: larger approximated K",
-                "Manual M/L/K selection",
-            ],
-            horizontal=True,
-        )
-
-        if bit_filter_mode == "Accuracy-oriented: larger exact M":
-            selected_m_values = [value for value in m_options if value >= 8] or m_options
-            st.caption(
-                "Keeps only architectures with a larger exact MSB region "
-                "(M ≥ 8). Use this when accuracy is the priority."
-            )
-        elif bit_filter_mode == "Savings-oriented: larger approximated K":
-            selected_k_values = [value for value in k_options if value >= 8] or k_options
-            st.caption(
-                "Keeps only architectures with a larger approximated LSB region "
-                "(K ≥ 8). Use this when area/power saving is the priority."
-            )
-        elif bit_filter_mode == "Manual M/L/K selection":
-            bit_cols = st.columns(3, gap="large")
-            with bit_cols[0]:
-                selected_m_values = st.multiselect(
-                    "Exact region M",
-                    options=m_options,
-                    default=m_options,
-                    help="Number of most-significant bits kept exact.",
-                )
-            with bit_cols[1]:
-                selected_l_values = st.multiselect(
-                    "AxPPA region L",
-                    options=l_options,
-                    default=l_options,
-                    help="Number of intermediate bits handled by AxPPA.",
-                )
-            with bit_cols[2]:
-                selected_k_values = st.multiselect(
-                    "Approximated region K",
-                    options=k_options,
-                    default=k_options,
-                    help="Number of least-significant bits handled by the selected approximation.",
-                )
-
-        use_target_filters = st.checkbox(
-            "Use minimum saving/PPA targets",
-            value=False,
+            index=0,
             help=(
-                "Turn this on only if you want to hide architectures below "
-                "specific reduction targets."
+                "Only used to choose which rows enter Top/Best/Pareto graph views "
+                "and rankings. The main charts themselves stay fixed: power, area "
+                "and accuracy versus MRED."
             ),
         )
-        if use_target_filters:
-            reduction_cols = st.columns(3, gap="large")
-            with reduction_cols[0]:
-                min_power_reduction = st.slider(
-                    "Minimum power reduction (%)",
-                    min_value=float(grouped_base["total_power_reduction_pct"].min()),
-                    max_value=float(grouped_base["total_power_reduction_pct"].max()),
-                    value=float(grouped_base["total_power_reduction_pct"].min()),
-                    step=1.0,
-                )
-            with reduction_cols[1]:
-                min_area_reduction = st.slider(
-                    "Minimum area reduction (%)",
-                    min_value=float(grouped_base["total_area_reduction_pct"].min()),
-                    max_value=float(grouped_base["total_area_reduction_pct"].max()),
-                    value=float(grouped_base["total_area_reduction_pct"].min()),
-                    step=1.0,
-                )
-            with reduction_cols[2]:
-                min_ppa_gain = st.slider(
-                    "Minimum PPA gain (%)",
-                    min_value=float(grouped_base["ppa_gain_pct"].min()),
-                    max_value=float(grouped_base["ppa_gain_pct"].max()),
-                    value=float(grouped_base["ppa_gain_pct"].min()),
-                    step=1.0,
-                )
-        else:
-            st.caption(
-                "No minimum targets are applied. The only top-level numeric "
-                "cutoff is Maximum MRED."
-            )
+        primary_metric = MAXPPA_METRICS[primary_metric_label]
+
+    with display_filter_cols[2]:
+        show_graph_legend = st.checkbox("Show chart legend", value=False)
 
     if not selected_m_values:
         selected_m_values = m_options
@@ -1395,9 +1307,6 @@ filtered_by_structure = grouped_base[
     & grouped_base["l_bits"].isin(selected_l_values)
     & grouped_base["k_bits"].isin(selected_k_values)
     & (grouped_base["mred"] <= max_mred)
-    & (grouped_base["total_power_reduction_pct"] >= min_power_reduction)
-    & (grouped_base["total_area_reduction_pct"] >= min_area_reduction)
-    & (grouped_base["ppa_gain_pct"] >= min_ppa_gain)
 ].copy()
 
 maxppa_view = filtered_by_structure[
@@ -1438,6 +1347,18 @@ point_note = (
     " Exact coordinates are shown; overlapping/stacked dots indicate repeated "
     "MRED or synthesis values in the extracted reports."
 )
+range_summary = (
+    f"L={selected_l_range[0]}–{selected_l_range[1]}, "
+    f"K={selected_k_range[0]}–{selected_k_range[1]}"
+)
+selection_note = (
+    f"Filtered by {range_summary}. M remains implicit in each valid split "
+    "(M + L + K = 16). Rows shown: "
+    f"{graph_display_label}; ranked/selected by {primary_metric_label}."
+)
+power_metric = "total_power_reduction_pct"
+area_metric = "total_area_reduction_pct"
+accuracy_metric = "mred_accuracy_pct"
 
 metric_col_1, metric_col_2, metric_col_3, metric_col_4, metric_col_5 = st.columns(
     5,
@@ -1475,17 +1396,12 @@ with metric_col_3:
 
 with metric_col_4:
     if maxppa_view.empty:
-        render_metric_card("Best Metric", "-", "Adjust filters")
+        render_metric_card("K/L Window", "-", "Adjust filters")
     else:
-        best_metric_value = sort_by_metric(maxppa_view, primary_metric).iloc[0][
-            primary_metric
-        ]
         render_metric_card(
-            "Best Metric",
-            f"{best_metric_value:.4f}"
-            if primary_metric == "mred"
-            else f"{best_metric_value:.2f}",
-            primary_metric_label,
+            "K/L Window",
+            range_summary,
+            "M follows valid 16-bit splits",
         )
 
 with metric_col_5:
@@ -1507,16 +1423,16 @@ else:
         with st.container(border=True):
             st.markdown(
                 f"""
-                <p class="chart-title">{MAXPPA_METRIC_LABELS[left_metric]} vs Error (MRED)</p>
-                <p class="chart-subtitle">Main view from extracted M-AxPPA synthesis reports. Display mode: {graph_display_label}.{point_note}</p>
+                <p class="chart-title">Power vs Error inside selected K/L range</p>
+                <p class="chart-subtitle">{selection_note}{point_note}</p>
                 """,
                 unsafe_allow_html=True,
             )
             st.plotly_chart(
                 build_maxppa_complete_scatter(
                     chart_view,
-                    left_metric,
-                    MAXPPA_METRIC_LABELS[left_metric],
+                    power_metric,
+                    MAXPPA_METRIC_LABELS[power_metric],
                     selected_maxppa_variants,
                     show_graph_legend,
                     x_metric,
@@ -1528,22 +1444,42 @@ else:
         with st.container(border=True):
             st.markdown(
                 f"""
-                <p class="chart-title">{MAXPPA_METRIC_LABELS[right_metric]} vs Error (MRED)</p>
-                <p class="chart-subtitle">Main view from extracted M-AxPPA synthesis reports. Display mode: {graph_display_label}.{point_note}</p>
+                <p class="chart-title">Area vs Error inside selected K/L range</p>
+                <p class="chart-subtitle">{selection_note}{point_note}</p>
                 """,
                 unsafe_allow_html=True,
             )
             st.plotly_chart(
                 build_maxppa_complete_scatter(
                     chart_view,
-                    right_metric,
-                    MAXPPA_METRIC_LABELS[right_metric],
+                    area_metric,
+                    MAXPPA_METRIC_LABELS[area_metric],
                     selected_maxppa_variants,
                     show_graph_legend,
                     x_metric,
                     x_metric_label,
                 ),
             )
+
+    with st.container(border=True):
+        st.markdown(
+            f"""
+            <p class="chart-title">Accuracy vs Error inside selected K/L range</p>
+            <p class="chart-subtitle">Accuracy is derived from MRED as 100 × (1 − MRED), clipped to the 0–100 range. {selection_note}</p>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.plotly_chart(
+            build_maxppa_complete_scatter(
+                chart_view,
+                accuracy_metric,
+                MAXPPA_METRIC_LABELS[accuracy_metric],
+                selected_maxppa_variants,
+                show_graph_legend,
+                x_metric,
+                x_metric_label,
+            ),
+        )
 
 if not maxppa_view.empty:
     tab_names = ["LSB Trio Compare", "Rankings", "Pareto", "Synthesis Details"]
@@ -1728,65 +1664,100 @@ if not maxppa_view.empty:
         )
 
     with pareto_tab:
-        pareto_power = maxppa_view[mark_pareto_candidates(
-            maxppa_view,
-            "total_power_reduction_pct",
-        )]
-        pareto_area = maxppa_view[mark_pareto_candidates(
-            maxppa_view,
-            "total_area_reduction_pct",
-        )]
+        st.info(
+            f"Pareto candidates are computed after the current adder, L/K range "
+            f"and maximum-MRED filters. Current bit window: {range_summary}."
+        )
+        pareto_specs = [
+            (
+                "Power Pareto Candidates",
+                "total_power_reduction_pct",
+                "Total power reduction (%)",
+                "not dominated by lower error and higher power reduction",
+            ),
+            (
+                "Area Pareto Candidates",
+                "total_area_reduction_pct",
+                "Total area reduction (%)",
+                "not dominated by lower error and higher area reduction",
+            ),
+            (
+                "Accuracy Pareto Candidates",
+                "mred_accuracy_pct",
+                "MRED-based accuracy (%)",
+                "not dominated by lower error and higher MRED-based accuracy",
+            ),
+        ]
+        pareto_candidate_frames = []
+        pareto_cols = st.columns(3, gap="large")
 
-        pareto_power_col, pareto_area_col = st.columns(2, gap="large")
-        with pareto_power_col:
-            with st.container(border=True):
-                st.markdown(
-                    """
-                    <p class="chart-title">Power Pareto Candidates</p>
-                    <p class="chart-subtitle">Diamonds mark architectures not dominated by lower error and higher power reduction.</p>
-                    """,
-                    unsafe_allow_html=True,
-                )
-                fig_pareto_power = build_maxppa_complete_scatter(
-                    maxppa_view,
+        for pareto_col, (title, metric, label, explanation) in zip(
+            pareto_cols,
+            pareto_specs,
+        ):
+            pareto_candidates = maxppa_view[
+                mark_pareto_candidates(maxppa_view, metric)
+            ].copy()
+            pareto_candidates["pareto_target"] = label
+            pareto_candidate_frames.append(pareto_candidates)
+
+            with pareto_col:
+                with st.container(border=True):
+                    st.markdown(
+                        f"""
+                        <p class="chart-title">{title}</p>
+                        <p class="chart-subtitle">Diamonds mark architectures {explanation} inside the selected K/L range.</p>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                    fig_pareto = build_maxppa_complete_scatter(
+                        maxppa_view,
+                        metric,
+                        label,
+                        selected_maxppa_variants,
+                    )
+                    fig_pareto.update_traces(opacity=0.26)
+                    fig_pareto.add_scatter(
+                        x=pareto_candidates["mred"],
+                        y=pareto_candidates[metric],
+                        mode="markers",
+                        marker={"size": 11, "symbol": "diamond", "color": "#111827"},
+                        name="Pareto candidate",
+                    )
+                    st.plotly_chart(fig_pareto)
+
+        pareto_union = (
+            pd.concat(pareto_candidate_frames, ignore_index=True)
+            .drop_duplicates(subset=["architecture", "pareto_target"])
+            .sort_values(["pareto_target", "mred"])
+        )
+        st.markdown(
+            """
+            <p class="chart-title">Pareto Candidate Table</p>
+            <p class="chart-subtitle">Architectures selected by at least one Pareto target for the current filters.</p>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.dataframe(
+            pareto_union[
+                [
+                    "pareto_target",
+                    "architecture",
+                    "variant",
+                    "m_bits",
+                    "l_bits",
+                    "k_bits",
+                    "mred",
+                    "mred_accuracy_pct",
                     "total_power_reduction_pct",
-                    "Total power reduction (%)",
-                    selected_maxppa_variants,
-                )
-                fig_pareto_power.update_traces(opacity=0.28)
-                fig_pareto_power.add_scatter(
-                    x=pareto_power["mred"],
-                    y=pareto_power["total_power_reduction_pct"],
-                    mode="markers",
-                    marker={"size": 11, "symbol": "diamond", "color": "#111827"},
-                    name="Pareto candidate",
-                )
-                st.plotly_chart(fig_pareto_power)
-
-        with pareto_area_col:
-            with st.container(border=True):
-                st.markdown(
-                    """
-                    <p class="chart-title">Area Pareto Candidates</p>
-                    <p class="chart-subtitle">Diamonds mark architectures not dominated by lower error and higher area reduction.</p>
-                    """,
-                    unsafe_allow_html=True,
-                )
-                fig_pareto_area = build_maxppa_complete_scatter(
-                    maxppa_view,
                     "total_area_reduction_pct",
-                    "Total area reduction (%)",
-                    selected_maxppa_variants,
-                )
-                fig_pareto_area.update_traces(opacity=0.28)
-                fig_pareto_area.add_scatter(
-                    x=pareto_area["mred"],
-                    y=pareto_area["total_area_reduction_pct"],
-                    mode="markers",
-                    marker={"size": 11, "symbol": "diamond", "color": "#111827"},
-                    name="Pareto candidate",
-                )
-                st.plotly_chart(fig_pareto_area)
+                    "critical_delay_ns",
+                    "ppa_gain_pct",
+                ]
+            ],
+            width="stretch",
+            hide_index=True,
+        )
 
     with synthesis_tab:
         st.info(
