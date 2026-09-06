@@ -8,9 +8,13 @@ venv/
 *.sqlite-journal
 *.db-journal
 
-# Local learning/support notes not needed in the public portfolio repo
-docs/caderno_de_estudo.md
-docs/roteiro_de_inicio.md
-portfolio/checklist_publicacao_v1.md
-portfolio/curriculo_linkedin.md
+# Local inputs and generated auxiliary outputs
+data/raw/
+data/private/
+data/processed/tradeoff_dataset.csv
+data/processed/copy_variants_accuracy.csv
+data/processed/maxppa_complete_summary.csv
+data/processed/maxppa_missing_configurations.csv
+
+# Local support scripts
 scripts/source_tools/

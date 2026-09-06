@@ -7,12 +7,8 @@ import pandas as pd
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_INPUT = Path(
-    r"C:\Users\victo\Downloads\R2016a\bin\win64\resultados_completos.csv"
-)
+DEFAULT_INPUT = ROOT / "data" / "raw" / "resultados_completos.csv"
 DEFAULT_OUTPUT = ROOT / "data" / "processed" / "maxppa_complete_results.csv"
-DEFAULT_SUMMARY_OUTPUT = ROOT / "data" / "processed" / "maxppa_complete_summary.csv"
-DEFAULT_MISSING_OUTPUT = ROOT / "data" / "processed" / "maxppa_missing_configurations.csv"
 
 EXPECTED_VARIANTS = [
     "APROX5",
@@ -285,10 +281,28 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Prepare complete M-AxPPA synthesis/accuracy results for Streamlit."
     )
-    parser.add_argument("--input", type=Path, default=DEFAULT_INPUT)
+    parser.add_argument(
+        "--input",
+        type=Path,
+        default=DEFAULT_INPUT,
+        help=(
+            "Path to resultados_completos.csv. Defaults to "
+            "data/raw/resultados_completos.csv when no path is provided."
+        ),
+    )
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
-    parser.add_argument("--summary-output", type=Path, default=DEFAULT_SUMMARY_OUTPUT)
-    parser.add_argument("--missing-output", type=Path, default=DEFAULT_MISSING_OUTPUT)
+    parser.add_argument(
+        "--summary-output",
+        type=Path,
+        default=None,
+        help="Optional path for a variant-level summary CSV.",
+    )
+    parser.add_argument(
+        "--missing-output",
+        type=Path,
+        default=None,
+        help="Optional path for missing M/L/K configurations.",
+    )
     return parser
 
 
@@ -298,8 +312,14 @@ def main() -> None:
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     approx.to_csv(args.output, index=False)
-    summary.to_csv(args.summary_output, index=False)
-    missing.to_csv(args.missing_output, index=False)
+
+    if args.summary_output is not None:
+        args.summary_output.parent.mkdir(parents=True, exist_ok=True)
+        summary.to_csv(args.summary_output, index=False)
+
+    if args.missing_output is not None:
+        args.missing_output.parent.mkdir(parents=True, exist_ok=True)
+        missing.to_csv(args.missing_output, index=False)
 
     included = int(approx["included_in_dashboard"].sum())
     excluded = int((approx["included_in_dashboard"] == 0).sum())
@@ -307,7 +327,7 @@ def main() -> None:
     print(f"Output: {args.output}")
     print(f"Rows prepared: {len(approx)}")
     print(f"Rows included in dashboard by default: {included}")
-    print(f"Rows kept for audit but excluded by default: {excluded}")
+    print(f"Rows excluded from the default dashboard view: {excluded}")
     print("Variant summary:")
     print(
         summary[
@@ -320,7 +340,7 @@ def main() -> None:
             ]
         ].to_string(index=False)
     )
-    if not missing.empty:
+    if args.missing_output is not None and not missing.empty:
         print(f"Missing configurations written to: {args.missing_output}")
 
 

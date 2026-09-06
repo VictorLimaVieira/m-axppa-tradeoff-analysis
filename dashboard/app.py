@@ -6,12 +6,10 @@ import streamlit as st
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DATASET_PATH = ROOT / "data" / "processed" / "tradeoff_dataset.csv"
 HYBRID_VARIANTS_PATH = ROOT / "data" / "processed" / "hybrid_variants_accuracy.csv"
 MAXPPA_COMPLETE_RESULTS_PATH = (
     ROOT / "data" / "processed" / "maxppa_complete_results.csv"
 )
-DEFAULT_MAX_MRED = 0.10
 DEFAULT_MAXPPA_MAX_MRED = 0.50
 CORE_LSB_VARIANTS = ["COPY", "TRUNC", "LOA"]
 
@@ -342,21 +340,6 @@ st.markdown(
         text-align: center;
     }
 
-    .audit-warning {
-        background: #fff7cc;
-        border: 1px solid #d97706;
-        border-radius: 8px;
-        color: #713f12;
-        font-size: 0.95rem;
-        line-height: 1.45;
-        margin: 0.9rem 0 1rem 0;
-        padding: 0.85rem 1rem;
-    }
-
-    .audit-warning strong {
-        color: #713f12;
-    }
-
     [data-testid="stAlert"],
     [data-testid="stAlert"] * {
         color: #111827 !important;
@@ -482,13 +465,6 @@ st.markdown(
 
 
 @st.cache_data
-def load_data() -> pd.DataFrame:
-    if not DATASET_PATH.exists():
-        return pd.DataFrame()
-    return pd.read_csv(DATASET_PATH)
-
-
-@st.cache_data
 def load_hybrid_variants() -> pd.DataFrame:
     if not HYBRID_VARIANTS_PATH.exists():
         return pd.DataFrame()
@@ -512,7 +488,7 @@ def classify_lsb_group(variant: str) -> str:
     if variant in CORE_LSB_VARIANTS:
         return "Core LSB: COPY / TRUNC / LOA"
     if variant == "HEAA":
-        return "Incomplete audit: HEAA"
+        return "Incomplete HEAA set"
     return "Experimental LSB approximators"
 
 
@@ -548,65 +524,6 @@ def render_legend(variants: list[str]) -> None:
         """,
         unsafe_allow_html=True,
     )
-
-
-def build_scatter(
-    data: pd.DataFrame,
-    y: str,
-    y_label: str,
-    selected_variants: list[str],
-    x_limit: float,
-) -> px.scatter:
-    fig = px.scatter(
-        data,
-        x="mred",
-        y=y,
-        color="variant",
-        color_discrete_map=VARIANT_COLORS,
-        category_orders={"variant": selected_variants},
-        hover_data={
-            "family": True,
-            "variant": True,
-            "m_bits": True,
-            "l_bits": True,
-            "k_bits": True,
-            "mred": ":.4f",
-            y: ":.2f",
-            "balanced_score": ":.3f",
-        },
-    )
-    fig.update_traces(
-        marker={
-            "size": 8.5,
-            "opacity": 0.92,
-            "line": {"width": 0.55, "color": "#ffffff"},
-        }
-    )
-    fig.update_layout(
-        height=350,
-        showlegend=False,
-        paper_bgcolor="#ffffff",
-        plot_bgcolor="#ffffff",
-        margin=dict(l=8, r=8, t=8, b=8),
-        font=dict(color="#1f2937", family="Segoe UI"),
-    )
-    fig.update_xaxes(
-        title="Error (MRED)",
-        title_font={"color": "#1f2937", "size": 12},
-        tickfont={"color": "#475569", "size": 11},
-        gridcolor="#dfe4ec",
-        zeroline=False,
-        range=[0, max(0.01, x_limit)],
-    )
-    fig.update_yaxes(
-        title=y_label,
-        title_font={"color": "#1f2937", "size": 12},
-        tickfont={"color": "#475569", "size": 11},
-        gridcolor="#dfe4ec",
-        zeroline=False,
-        range=[0, 105],
-    )
-    return fig
 
 
 def build_hybrid_variant_line(data: pd.DataFrame, y: str, y_label: str) -> px.line:
@@ -1058,7 +975,6 @@ if not MAXPPA_COMPLETE_RESULTS_PATH.exists():
     st.stop()
 
 
-legacy_df = load_data()
 hybrid_variants_df = load_hybrid_variants()
 maxppa_complete_df = load_maxppa_complete_results()
 
@@ -1142,7 +1058,7 @@ with st.container(border=True):
     elif analysis_focus == "Experimental approximators only":
         grouped_base = maxppa_base[
             ~maxppa_base["variant"].isin(CORE_LSB_VARIANTS)
-            & (maxppa_base["lsb_group"] != "Incomplete audit: HEAA")
+            & (maxppa_base["lsb_group"] != "Incomplete HEAA set")
         ].copy()
     else:
         grouped_base = maxppa_base.copy()
@@ -1485,8 +1401,6 @@ if not maxppa_view.empty:
     tab_names = ["LSB Trio Compare", "Rankings", "Pareto", "Synthesis Details"]
     if not hybrid_variants_df.empty:
         tab_names.append("MATLAB Hybrid Accuracy")
-    if not legacy_df.empty:
-        tab_names.append("Legacy Synthetic Data")
 
     tabs = dict(zip(tab_names, st.tabs(tab_names)))
     lsb_trio_tab = tabs["LSB Trio Compare"]
@@ -1494,7 +1408,6 @@ if not maxppa_view.empty:
     pareto_tab = tabs["Pareto"]
     synthesis_tab = tabs["Synthesis Details"]
     hybrid_tab = tabs.get("MATLAB Hybrid Accuracy")
-    legacy_tab = tabs.get("Legacy Synthetic Data")
 
     with lsb_trio_tab:
         st.info(
@@ -1586,55 +1499,6 @@ if not maxppa_view.empty:
                             MAXPPA_METRIC_LABELS[trio_metric],
                         )
                     )
-
-            lsb_table = lsb_trio_view[
-                [
-                    "architecture",
-                    "variant",
-                    "config_index",
-                    "m_bits",
-                    "l_bits",
-                    "k_bits",
-                    "mred",
-                    "mred_accuracy_pct",
-                    "exact_accuracy_pct",
-                    "total_power_reduction_pct",
-                    "total_area_reduction_pct",
-                    "critical_delay_ns",
-                    "ppa_gain_pct",
-                ]
-            ].sort_values(["config_index", "variant"])
-            lsb_table = lsb_table.rename(
-                columns={
-                    "config_index": "bit_split_order",
-                    "m_bits": "M_exact_bits",
-                    "l_bits": "L_AxPPA_bits",
-                    "k_bits": "K_LSB_bits",
-                    "mred_accuracy_pct": "MRED_based_accuracy_pct",
-                    "exact_accuracy_pct": "exact_match_rate_pct",
-                }
-            )
-            st.dataframe(
-                lsb_table[
-                    [
-                        "architecture",
-                        "variant",
-                        "bit_split_order",
-                        "M_exact_bits",
-                        "L_AxPPA_bits",
-                        "K_LSB_bits",
-                        "mred",
-                        "MRED_based_accuracy_pct",
-                        "exact_match_rate_pct",
-                        "total_power_reduction_pct",
-                        "total_area_reduction_pct",
-                        "critical_delay_ns",
-                        "ppa_gain_pct",
-                    ]
-                ],
-                width="stretch",
-                hide_index=True,
-            )
 
     with ranking_tab:
         ranking_metric_complete = st.radio(
@@ -1826,33 +1690,6 @@ if not maxppa_view.empty:
                 )
                 st.dataframe(summary, width="stretch", hide_index=True)
 
-        table_columns = [
-            "architecture",
-            "variant",
-            "lsb_group",
-            "config_index",
-            "m_bits",
-            "l_bits",
-            "k_bits",
-            "mred",
-            "mred_accuracy_pct",
-            "exact_accuracy_pct",
-            "total_power_reduction_pct",
-            "total_area_reduction_pct",
-            "critical_delay_ns",
-            "energy_per_operation_fJ",
-            "pdp_fJ",
-            "ppa_gain_pct",
-            "included_in_dashboard",
-        ]
-        st.dataframe(
-            maxppa_view[table_columns].sort_values(
-                "ppa_gain_pct", ascending=False
-            ),
-            width="stretch",
-            hide_index=True,
-        )
-
     if hybrid_tab is not None:
         with hybrid_tab:
             st.info(
@@ -1909,95 +1746,10 @@ if not maxppa_view.empty:
                         build_hybrid_variant_line(hybrid_view, "ssim_error", "1 - SSIM"),
                     )
 
-            st.dataframe(
-                hybrid_view.sort_values(["config_index", "variant"]),
-                width="stretch",
-                hide_index=True,
-            )
-
-    if legacy_tab is not None:
-        with legacy_tab:
-            st.info(
-                "Legacy reference only: this synthetic dataset was the original "
-                "portfolio/demo view. It is no longer the source for the main "
-                "opening charts."
-            )
-            legacy_variants = sorted(legacy_df["variant"].unique())
-            selected_legacy_variants = st.multiselect(
-                "Legacy variants",
-                options=legacy_variants,
-                default=legacy_variants,
-            )
-            if not selected_legacy_variants:
-                selected_legacy_variants = legacy_variants
-
-            legacy_max_mred = st.slider(
-                "Legacy maximum MRED",
-                min_value=0.00,
-                max_value=0.30,
-                value=DEFAULT_MAX_MRED,
-                step=0.01,
-                format="%.2f",
-            )
-            legacy_filtered = legacy_df[
-                legacy_df["variant"].isin(selected_legacy_variants)
-                & (legacy_df["mred"] <= legacy_max_mred)
-            ].copy()
-
-            if legacy_filtered.empty:
-                st.warning("No legacy architectures match the selected filters.")
-            else:
-                legacy_energy_col, legacy_area_col = st.columns(2, gap="large")
-                with legacy_energy_col:
-                    st.plotly_chart(
-                        build_scatter(
-                            legacy_filtered,
-                            "energy_saving_pct",
-                            "Energy savings (%)",
-                            selected_legacy_variants,
-                            legacy_max_mred,
-                        ),
-                    )
-                with legacy_area_col:
-                    st.plotly_chart(
-                        build_scatter(
-                            legacy_filtered,
-                            "area_saving_pct",
-                            "Area savings (%)",
-                            selected_legacy_variants,
-                            legacy_max_mred,
-                        ),
-                    )
-                columns = [
-                    "family",
-                    "variant",
-                    "m_bits",
-                    "l_bits",
-                    "k_bits",
-                    "ssim",
-                    "ncc",
-                    "mae",
-                    "mre",
-                    "mred",
-                    "energy_saving_pct",
-                    "area_saving_pct",
-                    "balanced_score",
-                    "selected_for_synthesis",
-                ]
-                st.dataframe(
-                    legacy_filtered[columns].sort_values(
-                        "balanced_score",
-                        ascending=False,
-                    ),
-                    width="stretch",
-                    hide_index=True,
-                )
-
 st.markdown(
     """
     <div class="footer-note">
-    Main dashboard view uses the extracted M-AxPPA synthesis results. Legacy
-    synthetic data is kept only as a separate reference/audit tab.
+    Dashboard based on extracted M-AxPPA synthesis and MATLAB accuracy results.
     </div>
     """,
     unsafe_allow_html=True,
